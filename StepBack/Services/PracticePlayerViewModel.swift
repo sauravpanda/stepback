@@ -15,8 +15,14 @@ final class PracticePlayerViewModel: ObservableObject {
     @Published private(set) var loopStart: Double?
     @Published private(set) var loopEnd: Double?
 
+    @Published var mirrored: Bool = false
+
     let player: AVPlayer
-    private var timeObserver: Any?
+
+    // `timeObserver` is written once in init and read once in deinit — both
+    // outside the normal actor-isolated execution path — so it is marked
+    // nonisolated(unsafe) rather than dragged through MainActor.
+    private nonisolated(unsafe) var timeObserver: Any?
     private var playerItem: AVPlayerItem?
 
     private let assetIdentifier: String
@@ -83,6 +89,29 @@ final class PracticePlayerViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Frame stepping
+
+    func stepForward() { step(by: 1) }
+    func stepBackward() { step(by: -1) }
+
+    private func step(by count: Int) {
+        if isPlaying {
+            player.pause()
+            isPlaying = false
+        }
+        player.currentItem?.step(byCount: count)
+        let seconds = player.currentTime().seconds
+        if seconds.isFinite {
+            currentTime = max(0, min(seconds, duration))
+        }
+    }
+
+    // MARK: - Mirror
+
+    func toggleMirror() {
+        mirrored.toggle()
+    }
+
     // MARK: - A/B loop
 
     var hasLoopRegion: Bool {
@@ -125,19 +154,22 @@ final class PracticePlayerViewModel: ObservableObject {
             forInterval: interval,
             queue: .main
         ) { [weak self] time in
-            guard let self else { return }
-            let seconds = time.seconds
-            if seconds.isFinite {
-                self.currentTime = seconds
-                if case .seek(let target) = LoopEvaluator.action(
-                    currentTime: seconds,
-                    loopStart: self.loopStart,
-                    loopEnd: self.loopEnd
-                ) {
-                    self.seek(to: target)
+            // queue: .main guarantees we are on the main thread here.
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let seconds = time.seconds
+                if seconds.isFinite {
+                    self.currentTime = seconds
+                    if case .seek(let target) = LoopEvaluator.action(
+                        currentTime: seconds,
+                        loopStart: self.loopStart,
+                        loopEnd: self.loopEnd
+                    ) {
+                        self.seek(to: target)
+                    }
                 }
+                self.isPlaying = self.player.rate > 0
             }
-            self.isPlaying = self.player.rate > 0
         }
     }
 }
