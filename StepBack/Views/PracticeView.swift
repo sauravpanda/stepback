@@ -109,6 +109,12 @@ struct PracticeView: View {
         }
     }
 
+    private func rescaleBeats(by factor: Double) {
+        vm.rescaleBeats(for: clip, factor: factor) {
+            try? modelContext.save()
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         if let error = vm.loadError {
@@ -164,7 +170,8 @@ struct PracticeView: View {
                     isAnalyzing: vm.isAnalyzingBeats,
                     measurePosition: measurePosition,
                     beatsPerMeasure: clip.beatsPerMeasure,
-                    onDetect: { Task { await detectBeats() } }
+                    onDetect: { Task { await detectBeats() } },
+                    onRescale: clip.hasBeatAnalysis ? rescaleBeats : nil
                 )
                 Spacer()
             }

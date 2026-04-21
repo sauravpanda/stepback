@@ -8,6 +8,7 @@ struct BPMBadge: View {
     let measurePosition: Int?
     let beatsPerMeasure: Int
     let onDetect: () -> Void
+    var onRescale: ((Double) -> Void)?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -15,6 +16,10 @@ struct BPMBadge: View {
                 Text("\(Int(bpm.rounded())) BPM")
                     .font(.system(.footnote, design: .rounded, weight: .bold))
                     .foregroundStyle(Theme.Color.accent)
+                if let onRescale {
+                    RescaleButton(label: "÷2") { onRescale(0.5) }
+                    RescaleButton(label: "×2") { onRescale(2) }
+                }
                 if let measurePosition {
                     MeasureCounter(current: measurePosition, total: beatsPerMeasure)
                 }
@@ -36,6 +41,24 @@ struct BPMBadge: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Theme.Color.accentSoft, in: Capsule())
+    }
+}
+
+// MARK: - Rescale button
+
+private struct RescaleButton: View {
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(.caption2, design: .rounded, weight: .bold))
+                .foregroundStyle(Theme.Color.textPrimary)
+                .frame(width: 24, height: 20)
+                .background(Theme.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
     }
 }
 
