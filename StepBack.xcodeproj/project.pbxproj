@@ -11,6 +11,7 @@
 		1724638BD2B70699A591FE9B /* AutoTagService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99CA1B5B91B8D4637FEEF872 /* AutoTagService.swift */; };
 		1EC09265A1CD5B1E67415B39 /* StepBackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023608F63978F9D1668F5AFC /* StepBackApp.swift */; };
 		1F02ADF6471B01E48A824A49 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6745FF48B10D28A5ED4BB568 /* Models.swift */; };
+		2B90619AE0B5262B774DEAC1 /* PracticeControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35987D9825155E131A40950 /* PracticeControls.swift */; };
 		527B9B596B00D2C774173ECA /* PracticeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35AE6C8D6564306E1B0ADA20 /* PracticeView.swift */; };
 		5F405BD1B2F2EB7F30970683 /* LibraryFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4B3FD6B0A004C787FC243B /* LibraryFormatterTests.swift */; };
 		691A3AE86C110C252A1412FE /* BeatGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078CB839E392E788201DD665 /* BeatGrid.swift */; };
@@ -65,6 +66,7 @@
 		AAB30650146433E889DC2AF4 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		B5505E62D217CB6AA3579A6D /* PhotosServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosServiceTests.swift; sourceTree = "<group>"; };
 		B7C112AEA59633E85CF8267D /* ThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeTests.swift; sourceTree = "<group>"; };
+		C35987D9825155E131A40950 /* PracticeControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeControls.swift; sourceTree = "<group>"; };
 		C59BD8F65AE46261EEFD4F69 /* BeatDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatDetector.swift; sourceTree = "<group>"; };
 		CC6BAE20433D2ED45F00AD41 /* PracticeBeatUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeBeatUI.swift; sourceTree = "<group>"; };
 		D8F8476EAB523378C1F1E046 /* PhotosService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosService.swift; sourceTree = "<group>"; };
@@ -94,6 +96,7 @@
 				92D24FDCCE45AEFB352C5EBF /* CompareView.swift */,
 				AAB30650146433E889DC2AF4 /* LibraryView.swift */,
 				CC6BAE20433D2ED45F00AD41 /* PracticeBeatUI.swift */,
+				C35987D9825155E131A40950 /* PracticeControls.swift */,
 				35AE6C8D6564306E1B0ADA20 /* PracticeView.swift */,
 				56E94F050959741028A8574D /* RootView.swift */,
 			);
@@ -264,6 +267,7 @@
 				1F02ADF6471B01E48A824A49 /* Models.swift in Sources */,
 				F7AD3FACE8B875F1C9DFA310 /* PhotosService.swift in Sources */,
 				03C973FD27336E9DD2EDE507 /* PracticeBeatUI.swift in Sources */,
+				2B90619AE0B5262B774DEAC1 /* PracticeControls.swift in Sources */,
 				7FA3BBA0113FDF3282819E84 /* PracticePlayerViewModel.swift in Sources */,
 				527B9B596B00D2C774173ECA /* PracticeView.swift in Sources */,
 				9F90D5641396A9BF3E7A09FE /* RootView.swift in Sources */,
