@@ -163,6 +163,23 @@ final class PracticePlayerViewModel: ObservableObject {
         onSave()
     }
 
+    /// Rescales the cached beat grid by `factor` (2 or 0.5), updates the BPM,
+    /// and snaps any existing downbeat anchor to the nearest beat on the new
+    /// grid so the measure counter doesn't drift.
+    func rescaleBeats(for clip: DanceClip, factor: Double, onSave: @escaping () -> Void) {
+        guard clip.hasBeatAnalysis, factor > 0 else { return }
+        let rescaled = BeatGrid.rescale(beatTimes: clip.beatTimes, factor: factor)
+        clip.setBeatTimes(rescaled)
+        if let bpm = clip.bpm {
+            clip.bpm = bpm * factor
+        }
+        if let anchor = clip.firstDownbeatSeconds,
+           let snapped = BeatGrid.nearestBeatIndex(to: anchor, in: rescaled) {
+            clip.firstDownbeatSeconds = rescaled[snapped]
+        }
+        onSave()
+    }
+
     // MARK: - A/B loop
 
     var hasLoopRegion: Bool {
