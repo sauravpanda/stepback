@@ -91,6 +91,24 @@ struct PracticeView: View {
         try? modelContext.save()
     }
 
+    private func detectBeats() async {
+        await vm.detectBeats(for: clip) {
+            try? modelContext.save()
+        }
+    }
+
+    private func tapOnBeatOne() {
+        vm.tapOnBeatOne(for: clip) {
+            try? modelContext.save()
+        }
+    }
+
+    private func clearDownbeat() {
+        vm.clearDownbeatAnchor(for: clip) {
+            try? modelContext.save()
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         if let error = vm.loadError {
@@ -128,12 +146,42 @@ struct PracticeView: View {
     // MARK: - Controls
 
     private var controls: some View {
-        VStack(spacing: 14) {
+        let downbeats = BeatGrid.downbeatIndices(
+            beatTimes: clip.beatTimes,
+            anchor: clip.firstDownbeatSeconds,
+            beatsPerMeasure: clip.beatsPerMeasure
+        )
+        let measurePosition = BeatGrid.currentMeasurePosition(
+            currentTime: vm.currentTime,
+            beatTimes: clip.beatTimes,
+            anchor: clip.firstDownbeatSeconds,
+            beatsPerMeasure: clip.beatsPerMeasure
+        )
+        return VStack(spacing: 14) {
+            HStack {
+                BPMBadge(
+                    bpm: clip.bpm,
+                    isAnalyzing: vm.isAnalyzingBeats,
+                    measurePosition: measurePosition,
+                    beatsPerMeasure: clip.beatsPerMeasure,
+                    onDetect: { Task { await detectBeats() } }
+                )
+                Spacer()
+            }
+            if clip.hasBeatAnalysis {
+                DownbeatAnchorBar(
+                    hasAnchor: clip.firstDownbeatSeconds != nil,
+                    onTap: tapOnBeatOne,
+                    onClear: clearDownbeat
+                )
+            }
             Scrubber(
                 currentTime: vm.currentTime,
                 duration: vm.duration,
                 loopStart: vm.loopStart,
                 loopEnd: vm.loopEnd,
+                beatTimes: clip.beatTimes,
+                downbeatIndices: downbeats,
                 onSeek: vm.seek(to:)
             )
             HStack {
@@ -256,6 +304,8 @@ private struct Scrubber: View {
     let duration: Double
     let loopStart: Double?
     let loopEnd: Double?
+    let beatTimes: [Double]
+    let downbeatIndices: Set<Int>
     let onSeek: (Double) -> Void
 
     @GestureState private var dragProgress: Double?
@@ -268,6 +318,7 @@ private struct Scrubber: View {
                 Capsule()
                     .fill(Theme.Color.surfaceElevated)
                     .frame(height: 6)
+                beatTicksOverlay(width: width)
                 loopRegionOverlay(width: width)
                 Capsule()
                     .fill(Theme.Color.accent)
@@ -296,6 +347,24 @@ private struct Scrubber: View {
     }
 
     @ViewBuilder
+    private func beatTicksOverlay(width: CGFloat) -> some View {
+        if duration > 0, !beatTimes.isEmpty {
+            ZStack(alignment: .leading) {
+                ForEach(Array(beatTimes.enumerated()), id: \.offset) { index, time in
+                    let isDownbeat = downbeatIndices.contains(index)
+                    Rectangle()
+                        .fill(isDownbeat ? Theme.Color.accent : Theme.Color.textTertiary.opacity(0.6))
+                        .frame(
+                            width: isDownbeat ? 2 : 1,
+                            height: isDownbeat ? 14 : 8
+                        )
+                        .offset(x: width * (time / duration))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
     private func loopRegionOverlay(width: CGFloat) -> some View {
         if duration > 0, let start = loopStart, let end = loopEnd, end > start {
             let startX = width * min(1, max(0, start / duration))
@@ -309,37 +378,6 @@ private struct Scrubber: View {
                     .fill(Theme.Color.accent)
                     .frame(width: 2, height: 14)
                     .offset(x: max(0, edge - 1))
-            }
-        }
-    }
-}
-
-// MARK: - Speed pills
-
-struct SpeedPills: View {
-    static let speeds: [Double] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5]
-    let selected: Double
-    let onSelect: (Double) -> Void
-
-    var body: some View {
-        HStack(spacing: 6) {
-            ForEach(Self.speeds, id: \.self) { speed in
-                let isSelected = SpeedFormatter.equals(selected, speed)
-                let tint = Theme.Color.speedPillColor(for: speed)
-                Button {
-                    onSelect(speed)
-                } label: {
-                    Text(SpeedFormatter.pill(speed))
-                        .font(.system(.footnote, design: .rounded, weight: .semibold))
-                        .foregroundStyle(isSelected ? .black : tint)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(isSelected ? tint : Theme.Color.surfaceElevated)
-                        )
-                }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -511,32 +549,5 @@ private struct SaveMarkerSheet: View {
             }
         }
         .preferredColorScheme(.dark)
-    }
-}
-
-// MARK: - Formatting
-
-enum SpeedFormatter {
-    static func pill(_ speed: Double) -> String {
-        let base: String
-        if speed == speed.rounded() {
-            base = "\(Int(speed))"
-        } else {
-            base = String(format: "%g", speed)
-        }
-        return "\(base)×"
-    }
-
-    static func timestamp(_ seconds: Double) -> String {
-        guard seconds.isFinite, seconds >= 0 else { return "--:--" }
-        let totalCentis = Int((seconds * 100).rounded())
-        let mins = totalCentis / 6000
-        let secs = (totalCentis / 100) % 60
-        let cent = totalCentis % 100
-        return String(format: "%d:%02d.%02d", mins, secs, cent)
-    }
-
-    static func equals(_ a: Double, _ b: Double) -> Bool {
-        abs(a - b) < 0.001
     }
 }
