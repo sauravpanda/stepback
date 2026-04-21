@@ -181,6 +181,13 @@ struct PracticeView: View {
                     onTap: tapOnBeatOne,
                     onClear: clearDownbeat
                 )
+                StepTimingPanel(
+                    taps: vm.stepTaps,
+                    isActive: vm.stepTimingActive,
+                    onToggle: vm.toggleStepTiming,
+                    onTap: { vm.recordStepTap(against: clip.beatTimes) },
+                    onReset: vm.clearStepTaps
+                )
             }
             Scrubber(
                 currentTime: vm.currentTime,

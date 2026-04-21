@@ -20,6 +20,9 @@ final class PracticePlayerViewModel: ObservableObject {
     @Published private(set) var isAnalyzingBeats: Bool = false
     @Published var analysisError: String?
 
+    @Published var stepTimingActive: Bool = false
+    @Published private(set) var stepTaps: [StepTap] = []
+
     let player: AVPlayer
 
     // `timeObserver` is written once in init and read once in deinit — both
@@ -161,6 +164,28 @@ final class PracticePlayerViewModel: ObservableObject {
     func clearDownbeatAnchor(for clip: DanceClip, onSave: @escaping () -> Void) {
         clip.firstDownbeatSeconds = nil
         onSave()
+    }
+
+    // MARK: - Step timing
+
+    func toggleStepTiming() {
+        stepTimingActive.toggle()
+        if !stepTimingActive {
+            stepTaps.removeAll()
+        }
+    }
+
+    func recordStepTap(against beatTimes: [Double]) {
+        guard stepTimingActive, !beatTimes.isEmpty else { return }
+        guard let offset = BeatGrid.offsetMs(
+            from: currentTime,
+            toNearestBeatIn: beatTimes
+        ) else { return }
+        stepTaps.append(StepTap(time: currentTime, offsetMs: offset))
+    }
+
+    func clearStepTaps() {
+        stepTaps.removeAll()
     }
 
     /// Rescales the cached beat grid by `factor` (2 or 0.5), updates the BPM,
