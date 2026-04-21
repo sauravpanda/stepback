@@ -8,10 +8,12 @@ struct LibraryView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \DanceClip.dateAdded, order: .reverse) private var clips: [DanceClip]
+    @Query(sort: \Tag.name) private var tags: [Tag]
 
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var importState: ImportState = .idle
     @State private var importError: String?
+    @State private var selectedTagIDs: Set<UUID> = []
 
     private let columns = [GridItem(.adaptive(minimum: 140), spacing: 12)]
     private let photosService: PhotosServicing = PhotosService()
@@ -47,23 +49,41 @@ struct LibraryView: View {
 
     // MARK: - Content
 
+    private var filteredClips: [DanceClip] {
+        guard !selectedTagIDs.isEmpty else { return clips }
+        return clips.filter { clip in
+            clip.tags.contains { selectedTagIDs.contains($0.id) }
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         if clips.isEmpty {
             emptyState
         } else {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(clips) { clip in
-                        NavigationLink {
-                            PracticeView(clip: clip)
-                        } label: {
-                            LibraryCell(clip: clip)
+            VStack(spacing: 0) {
+                if !tags.isEmpty {
+                    TagFilterBar(
+                        tags: tags,
+                        selected: $selectedTagIDs,
+                        countFor: { tag in
+                            clips.filter { $0.tags.contains(where: { $0.id == tag.id }) }.count
                         }
-                        .buttonStyle(.plain)
-                    }
+                    )
                 }
-                .padding(12)
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(filteredClips) { clip in
+                            NavigationLink {
+                                PracticeView(clip: clip)
+                            } label: {
+                                LibraryCell(clip: clip)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(12)
+                }
             }
         }
     }
@@ -151,6 +171,37 @@ struct LibraryView: View {
         if imported == 0, importError == nil {
             importError = "No clips imported. Make sure you picked videos, not photos."
         }
+        if imported > 0 {
+            applyAutoTags()
+        }
+    }
+
+    /// Re-runs event clustering over all clips and attaches the resulting
+    /// \`Event: …\` tags. Existing tags are reused by name; new ones are
+    /// inserted. Clips already in the right cluster are left alone.
+    private func applyAutoTags() {
+        let allClips = clips.sorted { $0.dateAdded < $1.dateAdded }
+        let clusters = AutoTagService.cluster(dates: allClips.map(\.dateAdded))
+        for cluster in clusters {
+            let tag = findOrCreateTag(name: cluster.tagName, colorHex: cluster.colorHex)
+            for idx in cluster.indices {
+                let clip = allClips[idx]
+                if !clip.tags.contains(where: { $0.id == tag.id }) {
+                    clip.tags.append(tag)
+                }
+            }
+        }
+        try? modelContext.save()
+    }
+
+    private func findOrCreateTag(name: String, colorHex: String) -> Tag {
+        let descriptor = FetchDescriptor<Tag>(predicate: #Predicate { $0.name == name })
+        if let existing = try? modelContext.fetch(descriptor).first {
+            return existing
+        }
+        let tag = Tag(name: name, colorHex: colorHex)
+        modelContext.insert(tag)
+        return tag
     }
 
     private func importOne(_ item: PhotosPickerItem) async throws {
@@ -251,6 +302,61 @@ private struct LibraryCell: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(Color.black.opacity(0.55), in: Capsule())
+    }
+}
+
+// MARK: - Tag filter bar
+
+private struct TagFilterBar: View {
+    let tags: [Tag]
+    @Binding var selected: Set<UUID>
+    let countFor: (Tag) -> Int
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(tags) { tag in
+                    let isSelected = selected.contains(tag.id)
+                    let accent = Color(hex: UInt32(tag.colorHex.stripHex, radix: 16) ?? 0xFF3B7F)
+                    Button {
+                        if isSelected {
+                            selected.remove(tag.id)
+                        } else {
+                            selected.insert(tag.id)
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(accent)
+                                .frame(width: 8, height: 8)
+                            Text(tag.name)
+                                .font(.system(.footnote, design: .rounded, weight: .semibold))
+                            Text("\(countFor(tag))")
+                                .font(.system(.footnote, design: .monospaced))
+                                .foregroundStyle(Theme.Color.textTertiary)
+                        }
+                        .foregroundStyle(isSelected ? .black : Theme.Color.textPrimary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule().fill(isSelected ? accent : Theme.Color.surfaceElevated)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
+        .background(Theme.Color.background)
+    }
+}
+
+private extension String {
+    /// Strips a leading `#` and returns the hex remainder suitable for
+    /// `Int(_:radix:)` parsing.
+    var stripHex: Substring {
+        hasPrefix("#") ? dropFirst() : Substring(self)
     }
 }
 
