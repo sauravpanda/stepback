@@ -1,5 +1,5 @@
-@testable import StepBack
 import Foundation
+@testable import StepBack
 import XCTest
 
 final class BeatDetectorTests: XCTestCase {

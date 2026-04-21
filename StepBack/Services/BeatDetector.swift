@@ -108,7 +108,6 @@ enum BeatDetector {
 
     // MARK: - Onset envelope (half-wave rectified spectral flux)
 
-    // swiftlint:disable:next function_body_length
     static func computeOnsetEnvelope(
         samples: [Float],
         windowSize: Int,
@@ -162,8 +161,11 @@ enum BeatDetector {
                 }
             }
 
-            var sqrtCount = Int32(halfSize)
-            vvsqrtf(&magnitudes, &magnitudes, &sqrtCount)
+            magnitudes.withUnsafeMutableBufferPointer { buf in
+                guard let base = buf.baseAddress else { return }
+                var count = Int32(buf.count)
+                vvsqrtf(base, base, &count)
+            }
 
             vDSP_vsub(
                 previousMagnitudes, 1,
@@ -171,8 +173,11 @@ enum BeatDetector {
                 &diff, 1,
                 vDSP_Length(halfSize)
             )
-            var zero: Float = 0
-            vDSP_vthr(diff, 1, &zero, &diff, 1, vDSP_Length(halfSize))
+            diff.withUnsafeMutableBufferPointer { buf in
+                guard let base = buf.baseAddress else { return }
+                var zero: Float = 0
+                vDSP_vthr(base, 1, &zero, base, 1, vDSP_Length(buf.count))
+            }
             var flux: Float = 0
             vDSP_sve(diff, 1, &flux, vDSP_Length(halfSize))
 
