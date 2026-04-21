@@ -316,7 +316,7 @@ private struct Scrubber: View {
 
 // MARK: - Speed pills
 
-private struct SpeedPills: View {
+struct SpeedPills: View {
     static let speeds: [Double] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5]
     let selected: Double
     let onSelect: (Double) -> Void
