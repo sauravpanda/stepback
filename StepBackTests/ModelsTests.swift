@@ -35,6 +35,44 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(clip.durationSeconds, 0)
         XCTAssertTrue(clip.loopMarkers.isEmpty)
         XCTAssertTrue(clip.tags.isEmpty)
+
+        // Beat analysis defaults
+        XCTAssertNil(clip.bpm)
+        XCTAssertNil(clip.beatTimesData)
+        XCTAssertNil(clip.firstDownbeatSeconds)
+        XCTAssertEqual(clip.beatsPerMeasure, 4)
+        XCTAssertFalse(clip.hasBeatAnalysis)
+        XCTAssertEqual(clip.beatTimes, [])
+    }
+
+    // MARK: - Beat helpers
+
+    func testBeatTimesRoundTrip() throws {
+        let clip = DanceClip(title: "Beats", assetIdentifier: "B-1")
+        context.insert(clip)
+
+        let beats = [0.1, 0.6, 1.1, 1.6, 2.1]
+        clip.setBeatTimes(beats)
+        clip.bpm = 120
+        try context.save()
+
+        XCTAssertEqual(clip.beatTimes, beats)
+        XCTAssertTrue(clip.hasBeatAnalysis)
+    }
+
+    func testSetBeatTimesEmptyClearsCache() throws {
+        let clip = DanceClip(title: "Beats", assetIdentifier: "B-2")
+        clip.setBeatTimes([1, 2, 3])
+        XCTAssertNotNil(clip.beatTimesData)
+        clip.setBeatTimes([])
+        XCTAssertNil(clip.beatTimesData)
+        XCTAssertEqual(clip.beatTimes, [])
+    }
+
+    func testCorruptBeatTimesDataYieldsEmptyArray() {
+        let clip = DanceClip(title: "Corrupt", assetIdentifier: "B-3")
+        clip.beatTimesData = Data([0xFF, 0x00, 0x42])
+        XCTAssertEqual(clip.beatTimes, [])
     }
 
     // MARK: - LoopMarker
