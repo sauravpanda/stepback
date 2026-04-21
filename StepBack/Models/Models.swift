@@ -12,6 +12,12 @@ final class DanceClip: Equatable, Hashable {
     var thumbnailData: Data?
     var durationSeconds: Double
 
+    // Beat analysis, populated once by BeatDetector and cached in the store.
+    var bpm: Double?
+    var beatTimesData: Data?
+    var firstDownbeatSeconds: Double?
+    var beatsPerMeasure: Int = 4
+
     @Relationship(deleteRule: .cascade, inverse: \LoopMarker.clip)
     var loopMarkers: [LoopMarker] = []
 
@@ -43,6 +49,27 @@ final class DanceClip: Equatable, Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+
+    // MARK: - Beat helpers
+
+    /// Decoded beat times (seconds, monotonic). Empty when no analysis exists.
+    var beatTimes: [Double] {
+        guard let data = beatTimesData else { return [] }
+        return (try? JSONDecoder().decode([Double].self, from: data)) ?? []
+    }
+
+    /// Writes beat times back through `beatTimesData`. Empty clears the cache.
+    func setBeatTimes(_ times: [Double]) {
+        if times.isEmpty {
+            beatTimesData = nil
+            return
+        }
+        beatTimesData = try? JSONEncoder().encode(times)
+    }
+
+    var hasBeatAnalysis: Bool {
+        bpm != nil && beatTimesData != nil
     }
 }
 
