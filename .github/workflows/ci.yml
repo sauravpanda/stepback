@@ -77,6 +77,33 @@ jobs:
       - name: Install xcbeautify
         run: brew install xcbeautify
 
+      - name: Pick iOS simulator
+        id: sim
+        run: |
+          # GitHub runners sometimes omit the expected default simulator. Pick
+          # whichever iPhone is actually booted-or-bootable and export its UDID.
+          set -euo pipefail
+          udid=$(xcrun simctl list devices available --json \
+            | python3 -c '
+import json, sys
+data = json.load(sys.stdin)["devices"]
+candidates = []
+for runtime, devs in data.items():
+    if "iOS" not in runtime:
+        continue
+    for dev in devs:
+        if dev.get("isAvailable") and "iPhone" in dev.get("name", ""):
+            candidates.append((runtime, dev["name"], dev["udid"]))
+# Prefer the newest iOS runtime by lexical sort
+candidates.sort(reverse=True)
+if not candidates:
+    sys.exit("No available iPhone simulator found")
+runtime, name, udid = candidates[0]
+print(udid)
+print(f"::notice::Using simulator {name} ({runtime})", file=sys.stderr)
+')
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
       - name: Build
         run: |
           if [ -f "StepBack.xcodeproj/project.pbxproj" ]; then
@@ -84,7 +111,7 @@ jobs:
             xcodebuild \
               -project StepBack.xcodeproj \
               -scheme StepBack \
-              -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+              -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
               -configuration Debug \
               CODE_SIGNING_ALLOWED=NO \
               build-for-testing | xcbeautify
@@ -99,7 +126,7 @@ jobs:
             xcodebuild \
               -project StepBack.xcodeproj \
               -scheme StepBack \
-              -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+              -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
               -configuration Debug \
               CODE_SIGNING_ALLOWED=NO \
               test-without-building | xcbeautify

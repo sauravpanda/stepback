@@ -1,6 +1,6 @@
-@testable import StepBack
 import AVFoundation
 import Photos
+@testable import StepBack
 import XCTest
 
 final class PhotosServiceTests: XCTestCase {
