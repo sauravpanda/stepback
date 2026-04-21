@@ -13,7 +13,7 @@ concurrency:
 jobs:
   lint:
     name: SwiftLint
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -30,7 +30,7 @@ jobs:
 
   project-sync:
     name: Project sync (xcodegen)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -58,13 +58,18 @@ jobs:
 
   build:
     name: Build & Test
-    runs-on: macos-14
+    runs-on: macos-15
     needs: project-sync
     steps:
       - uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+        run: |
+          # Pick the newest installed Xcode 16.x; falls back to default if none found.
+          candidate=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$candidate" ]; then
+            sudo xcode-select -s "$candidate"
+          fi
 
       - name: Show Xcode version
         run: xcodebuild -version

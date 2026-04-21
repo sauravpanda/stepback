@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Xcode 15.4+
+- Xcode 16+ (current `project.pbxproj` uses object version 77)
 - iOS 17+ device or simulator (SwiftData)
 - Apple ID (free signing works for personal use)
 

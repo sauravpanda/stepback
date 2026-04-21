@@ -11,7 +11,7 @@ StepBack is a personal-scratch tool that happens to be open source. Contribution
 
 ## Dev setup
 
-1. Xcode 15.4+
+1. Xcode 16+
 2. `brew install swiftlint xcodegen` (both enforced by CI)
 3. Open `StepBack.xcodeproj` — if you change the target structure, edit `project.yml` and run `xcodegen generate`
 4. Cmd+R on a device. Simulator works for layout, but AVFoundation behavior (pitch preservation, frame stepping) must be verified on hardware.
