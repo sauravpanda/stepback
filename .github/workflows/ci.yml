@@ -21,7 +21,12 @@ jobs:
         run: brew install swiftlint
 
       - name: Run SwiftLint
-        run: swiftlint lint --strict --reporter github-actions-logging
+        run: |
+          if ls **/*.swift *.swift 2>/dev/null | head -1 | grep -q .; then
+            swiftlint lint --strict --reporter github-actions-logging
+          else
+            echo "No Swift files yet — skipping lint. Job will activate once the app is scaffolded (issue #1)."
+          fi
 
   build:
     name: Build & Test
