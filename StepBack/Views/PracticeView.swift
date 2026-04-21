@@ -73,47 +73,6 @@ struct PracticeView: View {
         }
     }
 
-    private func saveMarker(label: String, speed: Double) {
-        guard let start = vm.loopStart, let end = vm.loopEnd, end > start else { return }
-        let marker = LoopMarker(
-            label: label,
-            startSeconds: start,
-            endSeconds: end,
-            preferredSpeed: speed,
-            clip: clip
-        )
-        modelContext.insert(marker)
-        try? modelContext.save()
-    }
-
-    private func deleteMarker(_ marker: LoopMarker) {
-        modelContext.delete(marker)
-        try? modelContext.save()
-    }
-
-    private func detectBeats() async {
-        await vm.detectBeats(for: clip) {
-            try? modelContext.save()
-        }
-    }
-
-    private func tapOnBeatOne() {
-        vm.tapOnBeatOne(for: clip) {
-            try? modelContext.save()
-        }
-    }
-
-    private func clearDownbeat() {
-        vm.clearDownbeatAnchor(for: clip) {
-            try? modelContext.save()
-        }
-    }
-
-    private func rescaleBeats(by factor: Double) {
-        vm.rescaleBeats(for: clip, factor: factor) {
-            try? modelContext.save()
-        }
-    }
 
     @ViewBuilder
     private var content: some View {
@@ -279,6 +238,52 @@ struct PracticeView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Clear loop")
             }
+        }
+    }
+}
+
+// MARK: - Persistence + command helpers
+
+extension PracticeView {
+    fileprivate func saveMarker(label: String, speed: Double) {
+        guard let start = vm.loopStart, let end = vm.loopEnd, end > start else { return }
+        let marker = LoopMarker(
+            label: label,
+            startSeconds: start,
+            endSeconds: end,
+            preferredSpeed: speed,
+            clip: clip
+        )
+        modelContext.insert(marker)
+        try? modelContext.save()
+    }
+
+    fileprivate func deleteMarker(_ marker: LoopMarker) {
+        modelContext.delete(marker)
+        try? modelContext.save()
+    }
+
+    fileprivate func detectBeats() async {
+        await vm.detectBeats(for: clip) {
+            try? modelContext.save()
+        }
+    }
+
+    fileprivate func tapOnBeatOne() {
+        vm.tapOnBeatOne(for: clip) {
+            try? modelContext.save()
+        }
+    }
+
+    fileprivate func clearDownbeat() {
+        vm.clearDownbeatAnchor(for: clip) {
+            try? modelContext.save()
+        }
+    }
+
+    fileprivate func rescaleBeats(by factor: Double) {
+        vm.rescaleBeats(for: clip, factor: factor) {
+            try? modelContext.save()
         }
     }
 }

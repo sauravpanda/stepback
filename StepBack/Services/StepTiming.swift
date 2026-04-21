@@ -47,6 +47,14 @@ enum StepRating: Equatable {
     }
 }
 
+struct BucketCounts: Equatable {
+    var perfect: Int = 0
+    var good: Int = 0
+    var off: Int = 0
+
+    var total: Int { perfect + good + off }
+}
+
 enum StepTimingStats {
     /// Arithmetic mean of the offsets in milliseconds. Negative = average
     /// tap is early; positive = average tap is late.
@@ -57,17 +65,15 @@ enum StepTimingStats {
     }
 
     /// Per-bucket count for quick glance stats.
-    static func bucketCounts(_ taps: [StepTap]) -> (perfect: Int, good: Int, off: Int) {
-        var perfect = 0
-        var good = 0
-        var off = 0
+    static func bucketCounts(_ taps: [StepTap]) -> BucketCounts {
+        var counts = BucketCounts()
         for tap in taps {
             switch StepRating(offsetMs: tap.offsetMs) {
-            case .perfect: perfect += 1
-            case .good: good += 1
-            case .off: off += 1
+            case .perfect: counts.perfect += 1
+            case .good: counts.good += 1
+            case .off: counts.off += 1
             }
         }
-        return (perfect, good, off)
+        return counts
     }
 }

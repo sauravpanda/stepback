@@ -51,6 +51,6 @@ final class StepTimingTests: XCTestCase {
         XCTAssertEqual(counts.perfect, 2)
         XCTAssertEqual(counts.good, 2)
         XCTAssertEqual(counts.off, 2)
-        XCTAssertEqual(counts.perfect + counts.good + counts.off, taps.count)
+        XCTAssertEqual(counts.total, taps.count)
     }
 }
