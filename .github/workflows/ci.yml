@@ -77,6 +77,23 @@ jobs:
       - name: Install xcbeautify
         run: brew install xcbeautify
 
+      - name: Pick iOS simulator
+        id: sim
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Runners sometimes ship without the expected default iOS simulator.
+          # Grab the UDID of the first available iPhone sim regardless of runtime.
+          line=$(xcrun simctl list devices available | grep -E "iPhone [0-9].*\([0-9A-F-]+\) \(Shutdown\)" | head -1 || true)
+          if [ -z "$line" ]; then
+            echo "No iPhone simulator available on this runner:" >&2
+            xcrun simctl list devices available >&2
+            exit 1
+          fi
+          udid=$(echo "$line" | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' | head -1)
+          echo "Using simulator: $line"
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
       - name: Build
         run: |
           if [ -f "StepBack.xcodeproj/project.pbxproj" ]; then
@@ -84,7 +101,7 @@ jobs:
             xcodebuild \
               -project StepBack.xcodeproj \
               -scheme StepBack \
-              -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+              -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
               -configuration Debug \
               CODE_SIGNING_ALLOWED=NO \
               build-for-testing | xcbeautify
@@ -99,7 +116,7 @@ jobs:
             xcodebuild \
               -project StepBack.xcodeproj \
               -scheme StepBack \
-              -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+              -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
               -configuration Debug \
               CODE_SIGNING_ALLOWED=NO \
               test-without-building | xcbeautify
