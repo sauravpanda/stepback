@@ -28,6 +28,20 @@ struct PracticeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.Color.background, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    vm.toggleMirror()
+                } label: {
+                    Image(systemName: vm.mirrored
+                        ? "rectangle.portrait.on.rectangle.portrait.angled.fill"
+                        : "rectangle.portrait.on.rectangle.portrait.angled"
+                    )
+                    .foregroundStyle(vm.mirrored ? Theme.Color.accent : Theme.Color.textPrimary)
+                }
+                .accessibilityLabel(vm.mirrored ? "Unmirror video" : "Mirror video")
+            }
+        }
         .task { await vm.load() }
         .sheet(isPresented: $markerSheetPresented) {
             SaveMarkerSheet(
@@ -68,6 +82,7 @@ struct PracticeView: View {
         } else {
             VStack(spacing: 0) {
                 PlayerSurface(player: vm.player)
+                    .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
                     .aspectRatio(16.0 / 9.0, contentMode: .fit)
                     .background(Color.black)
                 controls
@@ -112,8 +127,11 @@ struct PracticeView: View {
                     .foregroundStyle(Theme.Color.textSecondary)
             }
             loopControls
-            HStack {
+            HStack(spacing: 32) {
                 Spacer()
+                FrameStepButton(systemName: "backward.frame.fill") {
+                    vm.stepBackward()
+                }
                 Button {
                     vm.togglePlayPause()
                 } label: {
@@ -124,6 +142,9 @@ struct PracticeView: View {
                         .background(Theme.Color.accent, in: Circle())
                 }
                 .buttonStyle(.plain)
+                FrameStepButton(systemName: "forward.frame.fill") {
+                    vm.stepForward()
+                }
                 Spacer()
             }
             SpeedPills(selected: vm.speed, onSelect: vm.setSpeed(_:))
@@ -302,6 +323,23 @@ private struct SpeedPills: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+}
+
+// MARK: - Frame step
+
+private struct FrameStepButton: View {
+    let systemName: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(Theme.Color.textPrimary)
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
     }
 }
 
