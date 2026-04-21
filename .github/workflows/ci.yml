@@ -84,7 +84,7 @@ jobs:
             xcodebuild \
               -project StepBack.xcodeproj \
               -scheme StepBack \
-              -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+              -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
               -configuration Debug \
               CODE_SIGNING_ALLOWED=NO \
               build-for-testing | xcbeautify
@@ -99,7 +99,7 @@ jobs:
             xcodebuild \
               -project StepBack.xcodeproj \
               -scheme StepBack \
-              -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+              -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
               -configuration Debug \
               CODE_SIGNING_ALLOWED=NO \
               test-without-building | xcbeautify
