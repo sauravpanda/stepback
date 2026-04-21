@@ -12,8 +12,10 @@
 		1EC09265A1CD5B1E67415B39 /* StepBackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023608F63978F9D1668F5AFC /* StepBackApp.swift */; };
 		1F02ADF6471B01E48A824A49 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6745FF48B10D28A5ED4BB568 /* Models.swift */; };
 		2B90619AE0B5262B774DEAC1 /* PracticeControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35987D9825155E131A40950 /* PracticeControls.swift */; };
+		4181110140BD581DBFB0A380 /* StepTimingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB3B8C1BB7ACE2D1C13C7200 /* StepTimingTests.swift */; };
 		527B9B596B00D2C774173ECA /* PracticeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35AE6C8D6564306E1B0ADA20 /* PracticeView.swift */; };
 		5F405BD1B2F2EB7F30970683 /* LibraryFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4B3FD6B0A004C787FC243B /* LibraryFormatterTests.swift */; };
+		622A6663058E88A57B465B62 /* StepTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0265ABC8E91AF4657EB95F83 /* StepTiming.swift */; };
 		691A3AE86C110C252A1412FE /* BeatGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078CB839E392E788201DD665 /* BeatGrid.swift */; };
 		76D520F6EC5A0A8E57C8AAA1 /* BeatDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BC077A9FA8B51D07C178A0 /* BeatDetectorTests.swift */; };
 		7FA3BBA0113FDF3282819E84 /* PracticePlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 543153BE7C96EE23F43CE81E /* PracticePlayerViewModel.swift */; };
@@ -45,6 +47,7 @@
 
 /* Begin PBXFileReference section */
 		023608F63978F9D1668F5AFC /* StepBackApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepBackApp.swift; sourceTree = "<group>"; };
+		0265ABC8E91AF4657EB95F83 /* StepTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepTiming.swift; sourceTree = "<group>"; };
 		078CB839E392E788201DD665 /* BeatGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatGrid.swift; sourceTree = "<group>"; };
 		0C54B956DF5DE01C00D95680 /* AutoTagServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoTagServiceTests.swift; sourceTree = "<group>"; };
 		16E676751B59ED083837CE39 /* SpeedFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedFormatterTests.swift; sourceTree = "<group>"; };
@@ -70,6 +73,7 @@
 		C59BD8F65AE46261EEFD4F69 /* BeatDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatDetector.swift; sourceTree = "<group>"; };
 		CC6BAE20433D2ED45F00AD41 /* PracticeBeatUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeBeatUI.swift; sourceTree = "<group>"; };
 		D8F8476EAB523378C1F1E046 /* PhotosService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosService.swift; sourceTree = "<group>"; };
+		DB3B8C1BB7ACE2D1C13C7200 /* StepTimingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepTimingTests.swift; sourceTree = "<group>"; };
 		F6BC077A9FA8B51D07C178A0 /* BeatDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatDetectorTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -114,6 +118,7 @@
 				848D52E156E709AA0226CEE8 /* ModelsTests.swift */,
 				B5505E62D217CB6AA3579A6D /* PhotosServiceTests.swift */,
 				16E676751B59ED083837CE39 /* SpeedFormatterTests.swift */,
+				DB3B8C1BB7ACE2D1C13C7200 /* StepTimingTests.swift */,
 				B7C112AEA59633E85CF8267D /* ThemeTests.swift */,
 			);
 			path = StepBackTests;
@@ -127,6 +132,7 @@
 				078CB839E392E788201DD665 /* BeatGrid.swift */,
 				D8F8476EAB523378C1F1E046 /* PhotosService.swift */,
 				543153BE7C96EE23F43CE81E /* PracticePlayerViewModel.swift */,
+				0265ABC8E91AF4657EB95F83 /* StepTiming.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -272,6 +278,7 @@
 				527B9B596B00D2C774173ECA /* PracticeView.swift in Sources */,
 				9F90D5641396A9BF3E7A09FE /* RootView.swift in Sources */,
 				1EC09265A1CD5B1E67415B39 /* StepBackApp.swift in Sources */,
+				622A6663058E88A57B465B62 /* StepTiming.swift in Sources */,
 				A49A15759EECD46EC5E3A694 /* Theme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -288,6 +295,7 @@
 				C376AB20647940A9E53A89D0 /* ModelsTests.swift in Sources */,
 				CC6F98E7716925F88449689A /* PhotosServiceTests.swift in Sources */,
 				F35848C14CA3DF06A4EBE554 /* SpeedFormatterTests.swift in Sources */,
+				4181110140BD581DBFB0A380 /* StepTimingTests.swift in Sources */,
 				C97E59DA25A51E16ECA03607 /* ThemeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

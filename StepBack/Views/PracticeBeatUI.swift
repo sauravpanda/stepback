@@ -85,6 +85,132 @@ struct MeasureCounter: View {
     }
 }
 
+// MARK: - Step timing panel
+
+struct StepTimingPanel: View {
+    let taps: [StepTap]
+    let isActive: Bool
+    let onToggle: () -> Void
+    let onTap: () -> Void
+    let onReset: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Label("Step timing", systemImage: "metronome")
+                    .font(.system(.footnote, design: .rounded, weight: .semibold))
+                    .foregroundStyle(isActive ? Theme.Color.accent : Theme.Color.textSecondary)
+                Spacer()
+                Button(isActive ? "Stop" : "Start", action: onToggle)
+                    .font(Theme.Font.caption)
+                    .foregroundStyle(Theme.Color.accent)
+            }
+            if isActive {
+                tapButton
+                StepHistogram(taps: taps)
+                    .frame(height: 44)
+                summary
+            }
+        }
+        .padding(12)
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var tapButton: some View {
+        Button(action: onTap) {
+            Text("Tap")
+                .font(.system(.title, design: .rounded, weight: .heavy))
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var summary: some View {
+        let average = StepTimingStats.averageOffsetMs(taps)
+        let counts = StepTimingStats.bucketCounts(taps)
+        return HStack(spacing: 14) {
+            if let average {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Avg offset")
+                        .font(Theme.Font.caption)
+                        .foregroundStyle(Theme.Color.textTertiary)
+                    Text(averageText(average))
+                        .font(Theme.Font.timestamp)
+                        .foregroundStyle(Theme.Color.textPrimary)
+                }
+            } else {
+                Text("Tap along with the beat")
+                    .font(Theme.Font.caption)
+                    .foregroundStyle(Theme.Color.textTertiary)
+            }
+            Spacer()
+            if !taps.isEmpty {
+                BucketBadge(color: StepRating.perfect.color, count: counts.perfect)
+                BucketBadge(color: StepRating.good.color, count: counts.good)
+                BucketBadge(color: StepRating.off.color, count: counts.off)
+                Button("Reset", action: onReset)
+                    .font(Theme.Font.caption)
+                    .foregroundStyle(Theme.Color.textTertiary)
+            }
+        }
+    }
+
+    private func averageText(_ value: Double) -> String {
+        let sign = value > 0 ? "+" : ""
+        let descriptor = value > 0 ? "late" : value < 0 ? "early" : "on beat"
+        return "\(sign)\(Int(value.rounded())) ms (\(descriptor))"
+    }
+}
+
+private struct StepHistogram: View {
+    let taps: [StepTap]
+
+    var body: some View {
+        GeometryReader { geo in
+            if taps.isEmpty {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Theme.Color.surfaceElevated)
+            } else {
+                let count = taps.count
+                let spacing: CGFloat = 2
+                let availableWidth = max(0, geo.size.width - CGFloat(count - 1) * spacing)
+                let barWidth = max(1, availableWidth / CGFloat(count))
+                HStack(alignment: .center, spacing: spacing) {
+                    ForEach(taps) { tap in
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(StepRating(offsetMs: tap.offsetMs).color)
+                            .frame(width: barWidth, height: barHeight(for: tap.offsetMs, in: geo.size.height))
+                            .offset(y: tap.offsetMs > 0 ? (geo.size.height - barHeight(for: tap.offsetMs, in: geo.size.height)) / 2 : -(geo.size.height - barHeight(for: tap.offsetMs, in: geo.size.height)) / 2)
+                    }
+                }
+            }
+        }
+    }
+
+    private func barHeight(for offsetMs: Double, in total: CGFloat) -> CGFloat {
+        let magnitude = min(200.0, abs(offsetMs))
+        let ratio = magnitude / 200.0
+        return max(6, total * CGFloat(ratio))
+    }
+}
+
+private struct BucketBadge: View {
+    let color: Color
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text("\(count)")
+                .font(Theme.Font.timestamp)
+                .foregroundStyle(Theme.Color.textSecondary)
+        }
+    }
+}
+
 // MARK: - Downbeat anchor controls
 
 struct DownbeatAnchorBar: View {
