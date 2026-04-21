@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class DanceClip {
+final class DanceClip: Equatable, Hashable {
     var id: UUID
     var title: String
     var assetIdentifier: String
@@ -35,6 +35,14 @@ final class DanceClip {
         self.notes = notes
         self.thumbnailData = thumbnailData
         self.durationSeconds = durationSeconds
+    }
+
+    static func == (lhs: DanceClip, rhs: DanceClip) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 

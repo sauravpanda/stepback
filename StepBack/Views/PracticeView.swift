@@ -11,6 +11,8 @@ struct PracticeView: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var vm: PracticePlayerViewModel
     @State private var markerSheetPresented = false
+    @State private var comparePickerPresented = false
+    @State private var compareSecondary: DanceClip?
 
     init(clip: DanceClip) {
         self.clip = clip
@@ -30,19 +32,36 @@ struct PracticeView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    vm.toggleMirror()
-                } label: {
-                    Image(systemName: vm.mirrored
-                        ? "rectangle.portrait.on.rectangle.portrait.angled.fill"
-                        : "rectangle.portrait.on.rectangle.portrait.angled"
-                    )
-                    .foregroundStyle(vm.mirrored ? Theme.Color.accent : Theme.Color.textPrimary)
+                HStack(spacing: 8) {
+                    Button {
+                        comparePickerPresented = true
+                    } label: {
+                        Image(systemName: "rectangle.2.swap")
+                            .foregroundStyle(Theme.Color.textPrimary)
+                    }
+                    .accessibilityLabel("Compare with another clip")
+                    Button {
+                        vm.toggleMirror()
+                    } label: {
+                        Image(systemName: vm.mirrored
+                            ? "rectangle.portrait.on.rectangle.portrait.angled.fill"
+                            : "rectangle.portrait.on.rectangle.portrait.angled"
+                        )
+                        .foregroundStyle(vm.mirrored ? Theme.Color.accent : Theme.Color.textPrimary)
+                    }
+                    .accessibilityLabel(vm.mirrored ? "Unmirror video" : "Mirror video")
                 }
-                .accessibilityLabel(vm.mirrored ? "Unmirror video" : "Mirror video")
             }
         }
         .task { await vm.load() }
+        .sheet(isPresented: $comparePickerPresented) {
+            CompareClipPicker(excludedID: clip.id) { picked in
+                compareSecondary = picked
+            }
+        }
+        .navigationDestination(item: $compareSecondary) { secondary in
+            CompareView(primary: clip, secondary: secondary)
+        }
         .sheet(isPresented: $markerSheetPresented) {
             SaveMarkerSheet(
                 defaultSpeed: vm.speed,
