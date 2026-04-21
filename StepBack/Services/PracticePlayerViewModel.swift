@@ -66,13 +66,25 @@ final class PracticePlayerViewModel: ObservableObject {
     // MARK: - Transport
 
     func togglePlayPause() {
-        if isPlaying {
-            player.pause()
-            isPlaying = false
-        } else {
-            player.playImmediately(atRate: Float(speed))
-            isPlaying = true
-        }
+        if isPlaying { pause() } else { play() }
+    }
+
+    func play() {
+        player.playImmediately(atRate: Float(speed))
+        isPlaying = true
+    }
+
+    func pause() {
+        player.pause()
+        isPlaying = false
+    }
+
+    func restart() {
+        seek(to: 0)
+    }
+
+    func setMuted(_ muted: Bool) {
+        player.isMuted = muted
     }
 
     func seek(to seconds: Double) {
