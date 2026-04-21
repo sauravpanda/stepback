@@ -10,7 +10,7 @@ final class AutoTagServiceTests: XCTestCase {
         comp.day = day
         comp.hour = hour
         comp.timeZone = TimeZone(secondsFromGMT: 0)
-        return Calendar(identifier: .gregorian).date(from: comp)!
+        return Calendar(identifier: .gregorian).date(from: comp) ?? Date.distantPast
     }
 
     func testEmptyReturnsEmpty() {

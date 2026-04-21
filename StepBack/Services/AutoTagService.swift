@@ -24,17 +24,18 @@ enum AutoTagService {
     static func cluster(dates: [Date], calendar: Calendar = .current) -> [ClusterDescriptor] {
         guard !dates.isEmpty else { return [] }
 
-        let indexed = dates.enumerated().sorted { $0.element < $1.element }
+        let sortedIndices = dates.indices.sorted { dates[$0] < dates[$1] }
         var clusters: [[(index: Int, date: Date)]] = []
         var current: [(index: Int, date: Date)] = []
         var previous: Date?
 
-        for (index, date) in indexed {
+        for originalIndex in sortedIndices {
+            let date = dates[originalIndex]
             if let prev = previous, date.timeIntervalSince(prev) > clusterGap {
                 clusters.append(current)
                 current = []
             }
-            current.append((index: index, date: date))
+            current.append((index: originalIndex, date: date))
             previous = date
         }
         if !current.isEmpty {
