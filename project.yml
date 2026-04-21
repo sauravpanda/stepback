@@ -1,0 +1,80 @@
+name: StepBack
+options:
+  bundleIdPrefix: com.stepback
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+  usesTabs: false
+  indentWidth: 4
+  tabWidth: 4
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: ""
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    CLANG_ENABLE_MODULES: YES
+    SWIFT_STRICT_CONCURRENCY: minimal
+
+targets:
+  StepBack:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: StepBack
+        excludes:
+          - "**/.gitkeep"
+    info:
+      path: StepBack/Generated-Info.plist
+      properties:
+        CFBundleDisplayName: StepBack
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.stepback.app
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "StepBack needs access to your videos so you can practice with them."
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        CODE_SIGN_STYLE: Automatic
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: "0.1.0"
+
+  StepBackTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: StepBackTests
+    dependencies:
+      - target: StepBack
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.stepback.app.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  StepBack:
+    build:
+      targets:
+        StepBack: all
+        StepBackTests: [test]
+    test:
+      targets:
+        - StepBackTests
+      gatherCoverageData: true

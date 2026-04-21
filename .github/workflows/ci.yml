@@ -13,7 +13,7 @@ concurrency:
 jobs:
   lint:
     name: SwiftLint
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -22,23 +22,60 @@ jobs:
 
       - name: Run SwiftLint
         run: |
-          if ls **/*.swift *.swift 2>/dev/null | head -1 | grep -q .; then
+          if find . -name "*.swift" -not -path "./.build/*" -not -path "./DerivedData/*" | head -1 | grep -q .; then
             swiftlint lint --strict --reporter github-actions-logging
           else
-            echo "No Swift files yet — skipping lint. Job will activate once the app is scaffolded (issue #1)."
+            echo "No Swift files yet — skipping lint."
+          fi
+
+  project-sync:
+    name: Project sync (xcodegen)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Regenerate project
+        run: |
+          if [ -f "project.yml" ]; then
+            xcodegen generate
+          else
+            echo "No project.yml yet — skipping."
+          fi
+
+      - name: Verify no drift
+        run: |
+          if [ -f "project.yml" ]; then
+            if ! git diff --quiet -- '*.pbxproj' 'xcshareddata' '*Generated-Info.plist'; then
+              echo "::error::project.yml and generated project files drifted. Run 'xcodegen generate' locally and commit the result."
+              git --no-pager diff -- '*.pbxproj' 'xcshareddata' '*Generated-Info.plist'
+              exit 1
+            fi
+            echo "Project files in sync with project.yml."
           fi
 
   build:
     name: Build & Test
-    runs-on: macos-14
+    runs-on: macos-15
+    needs: project-sync
     steps:
       - uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+        run: |
+          # Pick the newest installed Xcode 16.x; falls back to default if none found.
+          candidate=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$candidate" ]; then
+            sudo xcode-select -s "$candidate"
+          fi
 
       - name: Show Xcode version
         run: xcodebuild -version
+
+      - name: Install xcbeautify
+        run: brew install xcbeautify
 
       - name: Build
         run: |
@@ -47,15 +84,12 @@ jobs:
             xcodebuild \
               -project StepBack.xcodeproj \
               -scheme StepBack \
-              -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+              -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
               -configuration Debug \
               CODE_SIGNING_ALLOWED=NO \
-              build | xcbeautify
-          elif [ -f "Package.swift" ]; then
-            swift build
+              build-for-testing | xcbeautify
           else
-            echo "No Xcode project or Package.swift found yet — skipping build."
-            echo "This job will activate once the app is scaffolded (issue #1)."
+            echo "No Xcode project yet — skipping build."
           fi
 
       - name: Test
@@ -65,10 +99,10 @@ jobs:
             xcodebuild \
               -project StepBack.xcodeproj \
               -scheme StepBack \
-              -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+              -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
               -configuration Debug \
               CODE_SIGNING_ALLOWED=NO \
-              test | xcbeautify
+              test-without-building | xcbeautify
           else
-            echo "No test target yet — skipping."
+            echo "No test target — skipping."
           fi
