@@ -4,6 +4,7 @@ DerivedData/
 *.xcuserstate
 *.xcuserdatad/
 xcuserdata/
+
 *.mode1v3
 *.mode2v3
 *.perspectivev3
@@ -49,3 +50,6 @@ Icon?
 .env
 .env.*
 !.env.example
+
+# Local tooling state
+.claude/

@@ -17,6 +17,17 @@
 4. Select your device in the run destination
 5. Cmd+R
 
+## Project generation
+
+`project.yml` is the source of truth — `StepBack.xcodeproj` is generated from it by [XcodeGen](https://github.com/yonaskolb/XcodeGen). CI verifies the two stay in sync.
+
+```bash
+brew install xcodegen
+xcodegen generate
+```
+
+Re-run `xcodegen generate` after editing `project.yml`, then commit both `project.yml` and the regenerated project files. If you only ever edit code, you don't need XcodeGen installed locally.
+
 On the phone, the first time: **Settings → General → VPN & Device Management → trust your dev account.**
 
 ## Info.plist keys
