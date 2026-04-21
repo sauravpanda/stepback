@@ -12,6 +12,9 @@ final class PracticePlayerViewModel: ObservableObject {
     @Published private(set) var isReady: Bool = false
     @Published var loadError: String?
 
+    @Published private(set) var loopStart: Double?
+    @Published private(set) var loopEnd: Double?
+
     let player: AVPlayer
     private var timeObserver: Any?
     private var playerItem: AVPlayerItem?
@@ -80,6 +83,40 @@ final class PracticePlayerViewModel: ObservableObject {
         }
     }
 
+    // MARK: - A/B loop
+
+    var hasLoopRegion: Bool {
+        guard let start = loopStart, let end = loopEnd else { return false }
+        return end > start
+    }
+
+    func markLoopStart() {
+        loopStart = currentTime
+        if let end = loopEnd, end <= currentTime {
+            loopEnd = nil
+        }
+    }
+
+    func markLoopEnd() {
+        if let start = loopStart, currentTime <= start {
+            // Ignore: an end-before-start marker would be invalid.
+            return
+        }
+        loopEnd = currentTime
+    }
+
+    func clearLoop() {
+        loopStart = nil
+        loopEnd = nil
+    }
+
+    func applyMarker(_ marker: LoopMarker) {
+        loopStart = marker.startSeconds
+        loopEnd = marker.endSeconds
+        setSpeed(marker.preferredSpeed)
+        seek(to: marker.startSeconds)
+    }
+
     // MARK: - Observers
 
     private func attachTimeObserver() {
@@ -92,8 +129,38 @@ final class PracticePlayerViewModel: ObservableObject {
             let seconds = time.seconds
             if seconds.isFinite {
                 self.currentTime = seconds
+                if case .seek(let target) = LoopEvaluator.action(
+                    currentTime: seconds,
+                    loopStart: self.loopStart,
+                    loopEnd: self.loopEnd
+                ) {
+                    self.seek(to: target)
+                }
             }
             self.isPlaying = self.player.rate > 0
         }
+    }
+}
+
+// MARK: - Pure loop logic (testable without AVPlayer)
+
+enum LoopEvaluator {
+    enum Action: Equatable {
+        case none
+        case seek(to: Double)
+    }
+
+    static func action(
+        currentTime: Double,
+        loopStart: Double?,
+        loopEnd: Double?
+    ) -> Action {
+        guard let start = loopStart, let end = loopEnd, end > start else {
+            return .none
+        }
+        if currentTime >= end {
+            return .seek(to: start)
+        }
+        return .none
     }
 }
