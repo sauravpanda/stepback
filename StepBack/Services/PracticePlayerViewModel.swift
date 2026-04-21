@@ -17,6 +17,9 @@ final class PracticePlayerViewModel: ObservableObject {
 
     @Published var mirrored: Bool = false
 
+    @Published private(set) var isAnalyzingBeats: Bool = false
+    @Published var analysisError: String?
+
     let player: AVPlayer
 
     // `timeObserver` is written once in init and read once in deinit — both
@@ -122,6 +125,42 @@ final class PracticePlayerViewModel: ObservableObject {
 
     func toggleMirror() {
         mirrored.toggle()
+    }
+
+    // MARK: - Beat detection
+
+    /// Runs `BeatDetector` against the currently-loaded asset and writes the
+    /// result back into `clip`. The caller is responsible for persisting the
+    /// model context via `onSave`.
+    func detectBeats(for clip: DanceClip, onSave: @escaping () -> Void) async {
+        guard !isAnalyzingBeats, !clip.hasBeatAnalysis else { return }
+        guard let asset = player.currentItem?.asset else {
+            analysisError = "Clip hasn't finished loading yet."
+            return
+        }
+        isAnalyzingBeats = true
+        analysisError = nil
+        do {
+            let analysis = try await BeatDetector.analyze(asset: asset)
+            clip.bpm = analysis.bpm
+            clip.setBeatTimes(analysis.beatTimes)
+            isAnalyzingBeats = false
+            onSave()
+        } catch {
+            isAnalyzingBeats = false
+            analysisError = error.localizedDescription
+        }
+    }
+
+    /// Marks `currentTime` as beat 1. Caller persists.
+    func tapOnBeatOne(for clip: DanceClip, onSave: @escaping () -> Void) {
+        clip.firstDownbeatSeconds = currentTime
+        onSave()
+    }
+
+    func clearDownbeatAnchor(for clip: DanceClip, onSave: @escaping () -> Void) {
+        clip.firstDownbeatSeconds = nil
+        onSave()
     }
 
     // MARK: - A/B loop

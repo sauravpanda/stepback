@@ -7,11 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		03C973FD27336E9DD2EDE507 /* PracticeBeatUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC6BAE20433D2ED45F00AD41 /* PracticeBeatUI.swift */; };
 		1724638BD2B70699A591FE9B /* AutoTagService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99CA1B5B91B8D4637FEEF872 /* AutoTagService.swift */; };
 		1EC09265A1CD5B1E67415B39 /* StepBackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023608F63978F9D1668F5AFC /* StepBackApp.swift */; };
 		1F02ADF6471B01E48A824A49 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6745FF48B10D28A5ED4BB568 /* Models.swift */; };
 		527B9B596B00D2C774173ECA /* PracticeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35AE6C8D6564306E1B0ADA20 /* PracticeView.swift */; };
 		5F405BD1B2F2EB7F30970683 /* LibraryFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4B3FD6B0A004C787FC243B /* LibraryFormatterTests.swift */; };
+		691A3AE86C110C252A1412FE /* BeatGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078CB839E392E788201DD665 /* BeatGrid.swift */; };
 		76D520F6EC5A0A8E57C8AAA1 /* BeatDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BC077A9FA8B51D07C178A0 /* BeatDetectorTests.swift */; };
 		7FA3BBA0113FDF3282819E84 /* PracticePlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 543153BE7C96EE23F43CE81E /* PracticePlayerViewModel.swift */; };
 		9F90D5641396A9BF3E7A09FE /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E94F050959741028A8574D /* RootView.swift */; };
@@ -24,6 +26,7 @@
 		C97E59DA25A51E16ECA03607 /* ThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C112AEA59633E85CF8267D /* ThemeTests.swift */; };
 		CC6F98E7716925F88449689A /* PhotosServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5505E62D217CB6AA3579A6D /* PhotosServiceTests.swift */; };
 		D9873262DD68100D8D3C1021 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 462E264B215595E9EC3D1C4A /* Assets.xcassets */; };
+		DA0EE94353A18DA75824D7A8 /* BeatGridTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7093A077C0A2C139BD7BDD29 /* BeatGridTests.swift */; };
 		E9E06DF791FF47015B3DDFA8 /* BeatDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C59BD8F65AE46261EEFD4F69 /* BeatDetector.swift */; };
 		F35848C14CA3DF06A4EBE554 /* SpeedFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16E676751B59ED083837CE39 /* SpeedFormatterTests.swift */; };
 		F7AD3FACE8B875F1C9DFA310 /* PhotosService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8F8476EAB523378C1F1E046 /* PhotosService.swift */; };
@@ -41,6 +44,7 @@
 
 /* Begin PBXFileReference section */
 		023608F63978F9D1668F5AFC /* StepBackApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepBackApp.swift; sourceTree = "<group>"; };
+		078CB839E392E788201DD665 /* BeatGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatGrid.swift; sourceTree = "<group>"; };
 		0C54B956DF5DE01C00D95680 /* AutoTagServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoTagServiceTests.swift; sourceTree = "<group>"; };
 		16E676751B59ED083837CE39 /* SpeedFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedFormatterTests.swift; sourceTree = "<group>"; };
 		2D07843122196F5F0DA539D1 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -51,6 +55,7 @@
 		56E94F050959741028A8574D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		57317F752B65258CB2D04530 /* LoopEvaluatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopEvaluatorTests.swift; sourceTree = "<group>"; };
 		6745FF48B10D28A5ED4BB568 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		7093A077C0A2C139BD7BDD29 /* BeatGridTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatGridTests.swift; sourceTree = "<group>"; };
 		848D52E156E709AA0226CEE8 /* ModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsTests.swift; sourceTree = "<group>"; };
 		8B4B3FD6B0A004C787FC243B /* LibraryFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFormatterTests.swift; sourceTree = "<group>"; };
 		90115F7F368CDD3B0832B3B3 /* Generated-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Generated-Info.plist"; sourceTree = "<group>"; };
@@ -61,6 +66,7 @@
 		B5505E62D217CB6AA3579A6D /* PhotosServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosServiceTests.swift; sourceTree = "<group>"; };
 		B7C112AEA59633E85CF8267D /* ThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeTests.swift; sourceTree = "<group>"; };
 		C59BD8F65AE46261EEFD4F69 /* BeatDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatDetector.swift; sourceTree = "<group>"; };
+		CC6BAE20433D2ED45F00AD41 /* PracticeBeatUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeBeatUI.swift; sourceTree = "<group>"; };
 		D8F8476EAB523378C1F1E046 /* PhotosService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosService.swift; sourceTree = "<group>"; };
 		F6BC077A9FA8B51D07C178A0 /* BeatDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatDetectorTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -87,6 +93,7 @@
 			children = (
 				92D24FDCCE45AEFB352C5EBF /* CompareView.swift */,
 				AAB30650146433E889DC2AF4 /* LibraryView.swift */,
+				CC6BAE20433D2ED45F00AD41 /* PracticeBeatUI.swift */,
 				35AE6C8D6564306E1B0ADA20 /* PracticeView.swift */,
 				56E94F050959741028A8574D /* RootView.swift */,
 			);
@@ -98,6 +105,7 @@
 			children = (
 				0C54B956DF5DE01C00D95680 /* AutoTagServiceTests.swift */,
 				F6BC077A9FA8B51D07C178A0 /* BeatDetectorTests.swift */,
+				7093A077C0A2C139BD7BDD29 /* BeatGridTests.swift */,
 				8B4B3FD6B0A004C787FC243B /* LibraryFormatterTests.swift */,
 				57317F752B65258CB2D04530 /* LoopEvaluatorTests.swift */,
 				848D52E156E709AA0226CEE8 /* ModelsTests.swift */,
@@ -113,6 +121,7 @@
 			children = (
 				99CA1B5B91B8D4637FEEF872 /* AutoTagService.swift */,
 				C59BD8F65AE46261EEFD4F69 /* BeatDetector.swift */,
+				078CB839E392E788201DD665 /* BeatGrid.swift */,
 				D8F8476EAB523378C1F1E046 /* PhotosService.swift */,
 				543153BE7C96EE23F43CE81E /* PracticePlayerViewModel.swift */,
 			);
@@ -249,10 +258,12 @@
 			files = (
 				1724638BD2B70699A591FE9B /* AutoTagService.swift in Sources */,
 				E9E06DF791FF47015B3DDFA8 /* BeatDetector.swift in Sources */,
+				691A3AE86C110C252A1412FE /* BeatGrid.swift in Sources */,
 				B6CB4CFDF1EB16757B0D78AA /* CompareView.swift in Sources */,
 				A88000A1ACD9503F7A9D6143 /* LibraryView.swift in Sources */,
 				1F02ADF6471B01E48A824A49 /* Models.swift in Sources */,
 				F7AD3FACE8B875F1C9DFA310 /* PhotosService.swift in Sources */,
+				03C973FD27336E9DD2EDE507 /* PracticeBeatUI.swift in Sources */,
 				7FA3BBA0113FDF3282819E84 /* PracticePlayerViewModel.swift in Sources */,
 				527B9B596B00D2C774173ECA /* PracticeView.swift in Sources */,
 				9F90D5641396A9BF3E7A09FE /* RootView.swift in Sources */,
@@ -267,6 +278,7 @@
 			files = (
 				B3A98425CA93181D0723AB60 /* AutoTagServiceTests.swift in Sources */,
 				76D520F6EC5A0A8E57C8AAA1 /* BeatDetectorTests.swift in Sources */,
+				DA0EE94353A18DA75824D7A8 /* BeatGridTests.swift in Sources */,
 				5F405BD1B2F2EB7F30970683 /* LibraryFormatterTests.swift in Sources */,
 				BE33E08127A1601493FB7837 /* LoopEvaluatorTests.swift in Sources */,
 				C376AB20647940A9E53A89D0 /* ModelsTests.swift in Sources */,

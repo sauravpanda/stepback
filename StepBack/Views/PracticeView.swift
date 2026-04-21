@@ -91,6 +91,24 @@ struct PracticeView: View {
         try? modelContext.save()
     }
 
+    private func detectBeats() async {
+        await vm.detectBeats(for: clip) {
+            try? modelContext.save()
+        }
+    }
+
+    private func tapOnBeatOne() {
+        vm.tapOnBeatOne(for: clip) {
+            try? modelContext.save()
+        }
+    }
+
+    private func clearDownbeat() {
+        vm.clearDownbeatAnchor(for: clip) {
+            try? modelContext.save()
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         if let error = vm.loadError {
@@ -128,12 +146,42 @@ struct PracticeView: View {
     // MARK: - Controls
 
     private var controls: some View {
-        VStack(spacing: 14) {
+        let downbeats = BeatGrid.downbeatIndices(
+            beatTimes: clip.beatTimes,
+            anchor: clip.firstDownbeatSeconds,
+            beatsPerMeasure: clip.beatsPerMeasure
+        )
+        let measurePosition = BeatGrid.currentMeasurePosition(
+            currentTime: vm.currentTime,
+            beatTimes: clip.beatTimes,
+            anchor: clip.firstDownbeatSeconds,
+            beatsPerMeasure: clip.beatsPerMeasure
+        )
+        return VStack(spacing: 14) {
+            HStack {
+                BPMBadge(
+                    bpm: clip.bpm,
+                    isAnalyzing: vm.isAnalyzingBeats,
+                    measurePosition: measurePosition,
+                    beatsPerMeasure: clip.beatsPerMeasure,
+                    onDetect: { Task { await detectBeats() } }
+                )
+                Spacer()
+            }
+            if clip.hasBeatAnalysis {
+                DownbeatAnchorBar(
+                    hasAnchor: clip.firstDownbeatSeconds != nil,
+                    onTap: tapOnBeatOne,
+                    onClear: clearDownbeat
+                )
+            }
             Scrubber(
                 currentTime: vm.currentTime,
                 duration: vm.duration,
                 loopStart: vm.loopStart,
                 loopEnd: vm.loopEnd,
+                beatTimes: clip.beatTimes,
+                downbeatIndices: downbeats,
                 onSeek: vm.seek(to:)
             )
             HStack {
@@ -256,6 +304,8 @@ private struct Scrubber: View {
     let duration: Double
     let loopStart: Double?
     let loopEnd: Double?
+    let beatTimes: [Double]
+    let downbeatIndices: Set<Int>
     let onSeek: (Double) -> Void
 
     @GestureState private var dragProgress: Double?
@@ -268,6 +318,7 @@ private struct Scrubber: View {
                 Capsule()
                     .fill(Theme.Color.surfaceElevated)
                     .frame(height: 6)
+                beatTicksOverlay(width: width)
                 loopRegionOverlay(width: width)
                 Capsule()
                     .fill(Theme.Color.accent)
@@ -293,6 +344,24 @@ private struct Scrubber: View {
             )
         }
         .frame(height: 32)
+    }
+
+    @ViewBuilder
+    private func beatTicksOverlay(width: CGFloat) -> some View {
+        if duration > 0, !beatTimes.isEmpty {
+            ZStack(alignment: .leading) {
+                ForEach(Array(beatTimes.enumerated()), id: \.offset) { index, time in
+                    let isDownbeat = downbeatIndices.contains(index)
+                    Rectangle()
+                        .fill(isDownbeat ? Theme.Color.accent : Theme.Color.textTertiary.opacity(0.6))
+                        .frame(
+                            width: isDownbeat ? 2 : 1,
+                            height: isDownbeat ? 14 : 8
+                        )
+                        .offset(x: width * (time / duration))
+                }
+            }
+        }
     }
 
     @ViewBuilder
