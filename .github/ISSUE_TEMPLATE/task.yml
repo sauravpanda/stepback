@@ -1,0 +1,36 @@
+name: Task
+description: A roadmap build task — usually filed by the maintainer
+labels: [task]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Implementation notes
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Phase
+      options:
+        - v1 (core practice loop)
+        - v1.5 (beat detection)
+        - v2 (nice-to-haves)
+        - infra
+    validations:
+      required: true

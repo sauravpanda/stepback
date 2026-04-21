@@ -1,0 +1,44 @@
+name: Bug report
+description: Something broke, misbehaved, or crashed
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you see instead?
+      placeholder: "Tapped 'Detect beats' on a 30s clip and the BPM badge never appeared."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Import a clip from Photos
+        2. Open practice view
+        3. Tap 'Detect beats'
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      placeholder: "iPhone 15 Pro, iOS 17.5"
+    validations:
+      required: true
+
+  - type: input
+    id: clip
+    attributes:
+      label: Clip characteristics
+      description: Length, genre, bitrate if known
+      placeholder: "28s, swing, recorded on iPhone"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console logs
+      render: shell

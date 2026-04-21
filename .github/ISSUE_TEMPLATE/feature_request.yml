@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest something that would make practice better
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What practice problem does this solve?
+      description: Start from the pain, not the solution.
+      placeholder: "When I slow a clip to 0.25× the audio pitch-shifts and I can't hear the downbeat."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Which phase does this belong to?
+      options:
+        - v1 (core practice loop)
+        - v1.5 (beat detection)
+        - v2 (nice-to-haves)
+        - unsure
+    validations:
+      required: true

@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: SwiftLint
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint
+        run: swiftlint lint --strict --reporter github-actions-logging
+
+  build:
+    name: Build & Test
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build
+        run: |
+          if [ -f "StepBack.xcodeproj/project.pbxproj" ]; then
+            set -o pipefail
+            xcodebuild \
+              -project StepBack.xcodeproj \
+              -scheme StepBack \
+              -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+              -configuration Debug \
+              CODE_SIGNING_ALLOWED=NO \
+              build | xcbeautify
+          elif [ -f "Package.swift" ]; then
+            swift build
+          else
+            echo "No Xcode project or Package.swift found yet — skipping build."
+            echo "This job will activate once the app is scaffolded (issue #1)."
+          fi
+
+      - name: Test
+        run: |
+          if [ -f "StepBack.xcodeproj/project.pbxproj" ] && xcodebuild -project StepBack.xcodeproj -list 2>/dev/null | grep -q "StepBackTests"; then
+            set -o pipefail
+            xcodebuild \
+              -project StepBack.xcodeproj \
+              -scheme StepBack \
+              -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+              -configuration Debug \
+              CODE_SIGNING_ALLOWED=NO \
+              test | xcbeautify
+          else
+            echo "No test target yet — skipping."
+          fi
