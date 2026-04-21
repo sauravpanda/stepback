@@ -13,7 +13,9 @@
 		A49A15759EECD46EC5E3A694 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D07843122196F5F0DA539D1 /* Theme.swift */; };
 		C376AB20647940A9E53A89D0 /* ModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848D52E156E709AA0226CEE8 /* ModelsTests.swift */; };
 		C97E59DA25A51E16ECA03607 /* ThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C112AEA59633E85CF8267D /* ThemeTests.swift */; };
+		CC6F98E7716925F88449689A /* PhotosServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5505E62D217CB6AA3579A6D /* PhotosServiceTests.swift */; };
 		D9873262DD68100D8D3C1021 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 462E264B215595E9EC3D1C4A /* Assets.xcassets */; };
+		F7AD3FACE8B875F1C9DFA310 /* PhotosService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8F8476EAB523378C1F1E046 /* PhotosService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -36,7 +38,9 @@
 		848D52E156E709AA0226CEE8 /* ModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsTests.swift; sourceTree = "<group>"; };
 		90115F7F368CDD3B0832B3B3 /* Generated-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Generated-Info.plist"; sourceTree = "<group>"; };
 		A3776C829FB11907CC7E87F9 /* StepBack.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = StepBack.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B5505E62D217CB6AA3579A6D /* PhotosServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosServiceTests.swift; sourceTree = "<group>"; };
 		B7C112AEA59633E85CF8267D /* ThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeTests.swift; sourceTree = "<group>"; };
+		D8F8476EAB523378C1F1E046 /* PhotosService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -68,15 +72,25 @@
 			isa = PBXGroup;
 			children = (
 				848D52E156E709AA0226CEE8 /* ModelsTests.swift */,
+				B5505E62D217CB6AA3579A6D /* PhotosServiceTests.swift */,
 				B7C112AEA59633E85CF8267D /* ThemeTests.swift */,
 			);
 			path = StepBackTests;
+			sourceTree = "<group>";
+		};
+		BCF6C86F86D208F862212667 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				D8F8476EAB523378C1F1E046 /* PhotosService.swift */,
+			);
+			path = Services;
 			sourceTree = "<group>";
 		};
 		CD80E836058B8C1643707785 /* StepBack */ = {
 			isa = PBXGroup;
 			children = (
 				1473B0960203747345667BB7 /* Models */,
+				BCF6C86F86D208F862212667 /* Services */,
 				0CCE7D9CB9AEFC2FA82B2EFD /* Utilities */,
 				2BAE89F5B3212B0E382D6904 /* Views */,
 				462E264B215595E9EC3D1C4A /* Assets.xcassets */,
@@ -201,6 +215,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1F02ADF6471B01E48A824A49 /* Models.swift in Sources */,
+				F7AD3FACE8B875F1C9DFA310 /* PhotosService.swift in Sources */,
 				9F90D5641396A9BF3E7A09FE /* RootView.swift in Sources */,
 				1EC09265A1CD5B1E67415B39 /* StepBackApp.swift in Sources */,
 				A49A15759EECD46EC5E3A694 /* Theme.swift in Sources */,
@@ -212,6 +227,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C376AB20647940A9E53A89D0 /* ModelsTests.swift in Sources */,
+				CC6F98E7716925F88449689A /* PhotosServiceTests.swift in Sources */,
 				C97E59DA25A51E16ECA03607 /* ThemeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
