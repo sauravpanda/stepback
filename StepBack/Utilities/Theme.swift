@@ -55,4 +55,12 @@ extension Color {
         let blue = Double(hex & 0xFF) / 255
         self.init(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
     }
+
+    /// Parses a `"#RRGGBB"` or `"RRGGBB"` string into a Color. Falls back to
+    /// the theme accent if the string isn't a valid hex triplet.
+    init(tagHex: String) {
+        let stripped: Substring = tagHex.hasPrefix("#") ? tagHex.dropFirst() : Substring(tagHex)
+        let value = UInt32(stripped, radix: 16) ?? 0xFF3B7F
+        self.init(hex: value)
+    }
 }
