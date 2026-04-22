@@ -82,10 +82,12 @@ struct PracticeView: View {
                 .tint(Theme.Color.accent)
         } else {
             VStack(spacing: 0) {
-                PlayerSurface(player: vm.player)
-                    .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
-                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                    .background(Color.black)
+                ZoomablePlayerContainer {
+                    PlayerSurface(player: vm.player)
+                        .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
+                }
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                .background(Color.black)
                 controls
             }
         }

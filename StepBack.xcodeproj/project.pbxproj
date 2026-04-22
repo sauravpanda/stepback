@@ -26,6 +26,7 @@
 		B6CB4CFDF1EB16757B0D78AA /* CompareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D24FDCCE45AEFB352C5EBF /* CompareView.swift */; };
 		BE33E08127A1601493FB7837 /* LoopEvaluatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57317F752B65258CB2D04530 /* LoopEvaluatorTests.swift */; };
 		C376AB20647940A9E53A89D0 /* ModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848D52E156E709AA0226CEE8 /* ModelsTests.swift */; };
+		C7DD824378246BBC211824D8 /* ZoomablePlayerContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC399CE513ADED3ED5394848 /* ZoomablePlayerContainer.swift */; };
 		C97E59DA25A51E16ECA03607 /* ThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C112AEA59633E85CF8267D /* ThemeTests.swift */; };
 		CC6F98E7716925F88449689A /* PhotosServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5505E62D217CB6AA3579A6D /* PhotosServiceTests.swift */; };
 		D9873262DD68100D8D3C1021 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 462E264B215595E9EC3D1C4A /* Assets.xcassets */; };
@@ -67,6 +68,7 @@
 		99CA1B5B91B8D4637FEEF872 /* AutoTagService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoTagService.swift; sourceTree = "<group>"; };
 		A3776C829FB11907CC7E87F9 /* StepBack.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = StepBack.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AAB30650146433E889DC2AF4 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		AC399CE513ADED3ED5394848 /* ZoomablePlayerContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomablePlayerContainer.swift; sourceTree = "<group>"; };
 		B5505E62D217CB6AA3579A6D /* PhotosServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosServiceTests.swift; sourceTree = "<group>"; };
 		B7C112AEA59633E85CF8267D /* ThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeTests.swift; sourceTree = "<group>"; };
 		C35987D9825155E131A40950 /* PracticeControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeControls.swift; sourceTree = "<group>"; };
@@ -103,6 +105,7 @@
 				C35987D9825155E131A40950 /* PracticeControls.swift */,
 				35AE6C8D6564306E1B0ADA20 /* PracticeView.swift */,
 				56E94F050959741028A8574D /* RootView.swift */,
+				AC399CE513ADED3ED5394848 /* ZoomablePlayerContainer.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -280,6 +283,7 @@
 				1EC09265A1CD5B1E67415B39 /* StepBackApp.swift in Sources */,
 				622A6663058E88A57B465B62 /* StepTiming.swift in Sources */,
 				A49A15759EECD46EC5E3A694 /* Theme.swift in Sources */,
+				C7DD824378246BBC211824D8 /* ZoomablePlayerContainer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
