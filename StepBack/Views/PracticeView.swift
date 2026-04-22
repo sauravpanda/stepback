@@ -13,6 +13,7 @@ struct PracticeView: View {
     @State private var markerSheetPresented = false
     @State private var comparePickerPresented = false
     @State private var compareSecondary: DanceClip?
+    @State private var editSheetPresented = false
 
     init(clip: DanceClip) {
         self.clip = clip
@@ -33,6 +34,13 @@ struct PracticeView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 8) {
+                    Button {
+                        editSheetPresented = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .foregroundStyle(Theme.Color.textPrimary)
+                    }
+                    .accessibilityLabel("Edit clip")
                     Button {
                         comparePickerPresented = true
                     } label: {
@@ -70,6 +78,10 @@ struct PracticeView: View {
                 saveMarker(label: label, speed: speed)
             }
             .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $editSheetPresented) {
+            ClipEditView(clip: clip)
+                .preferredColorScheme(.dark)
         }
     }
 

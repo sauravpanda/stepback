@@ -15,6 +15,12 @@ struct LibraryView: View {
     @State private var importError: String?
     @State private var selectedTagIDs: Set<UUID> = []
 
+    @State private var editingClip: DanceClip?
+    @State private var isSelecting: Bool = false
+    @State private var selectedClipIDs: Set<UUID> = []
+    @State private var bulkMovePresented: Bool = false
+    @State private var deleteConfirmation: DeleteConfirmation?
+
     private let columns = [GridItem(.adaptive(minimum: 140), spacing: 12)]
     private let photosService: PhotosServicing = PhotosService()
 
@@ -47,7 +53,33 @@ struct LibraryView: View {
                 .task {
                     _ = await photosService.requestAuthorization()
                 }
+                .sheet(item: $editingClip) { clip in
+                    ClipEditView(clip: clip)
+                        .preferredColorScheme(.dark)
+                }
+                .sheet(isPresented: $bulkMovePresented) {
+                    BulkMoveToGroupView(clips: clipsMatching(selectedClipIDs))
+                        .preferredColorScheme(.dark)
+                        .onDisappear { exitSelectionMode() }
+                }
+                .confirmationDialog(
+                    deleteConfirmation?.title ?? "",
+                    isPresented: .init(
+                        get: { deleteConfirmation != nil },
+                        set: { if !$0 { deleteConfirmation = nil } }
+                    ),
+                    presenting: deleteConfirmation
+                ) { target in
+                    Button("Delete", role: .destructive) { commitDelete(target) }
+                    Button("Cancel", role: .cancel) { deleteConfirmation = nil }
+                } message: { target in
+                    Text(target.message)
+                }
         }
+    }
+
+    private func clipsMatching(_ ids: Set<UUID>) -> [DanceClip] {
+        clips.filter { ids.contains($0.id) }
     }
 
     // MARK: - Content
@@ -77,18 +109,77 @@ struct LibraryView: View {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(filteredClips) { clip in
-                            NavigationLink {
-                                PracticeView(clip: clip)
-                            } label: {
-                                LibraryCell(clip: clip)
-                            }
-                            .buttonStyle(.plain)
+                            clipCell(for: clip)
                         }
                     }
                     .padding(12)
                 }
+                if isSelecting {
+                    bulkActionBar
+                }
             }
         }
+    }
+
+    @ViewBuilder
+    private func clipCell(for clip: DanceClip) -> some View {
+        let isSelected = selectedClipIDs.contains(clip.id)
+        if isSelecting {
+            Button {
+                toggleSelection(clip)
+            } label: {
+                LibraryCell(
+                    clip: clip,
+                    selectionState: isSelected ? .selected : .unselected,
+                    onEdit: nil,
+                    onDelete: nil
+                )
+            }
+            .buttonStyle(.plain)
+        } else {
+            NavigationLink {
+                PracticeView(clip: clip)
+            } label: {
+                LibraryCell(
+                    clip: clip,
+                    selectionState: .hidden,
+                    onEdit: { editingClip = clip },
+                    onDelete: { deleteConfirmation = .single(clip) }
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var bulkActionBar: some View {
+        HStack(spacing: 12) {
+            Text("\(selectedClipIDs.count) selected")
+                .font(Theme.Font.bodyEmphasized)
+                .foregroundStyle(Theme.Color.textPrimary)
+            Spacer()
+            Button {
+                bulkMovePresented = true
+            } label: {
+                Label("Move", systemImage: "folder")
+                    .font(Theme.Font.bodyEmphasized)
+                    .foregroundStyle(Theme.Color.accent)
+            }
+            .disabled(selectedClipIDs.isEmpty)
+            Button(role: .destructive) {
+                deleteConfirmation = .bulk(clipsMatching(selectedClipIDs))
+            } label: {
+                Label("Delete", systemImage: "trash")
+                    .font(Theme.Font.bodyEmphasized)
+                    .foregroundStyle(.red)
+            }
+            .disabled(selectedClipIDs.isEmpty)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            Theme.Color.surfaceElevated
+                .overlay(Rectangle().frame(height: 1).foregroundStyle(Theme.Color.divider), alignment: .top)
+        )
     }
 
     private var emptyState: some View {
@@ -111,10 +202,20 @@ struct LibraryView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
-            if clips.isEmpty {
-                EmptyView()
-            } else {
-                importButton
+            if isSelecting {
+                Button("Done") { exitSelectionMode() }
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.accent)
+            } else if !clips.isEmpty {
+                HStack(spacing: 10) {
+                    Button {
+                        enterSelectionMode()
+                    } label: {
+                        Text("Select")
+                            .foregroundStyle(Theme.Color.textPrimary)
+                    }
+                    importButton
+                }
             }
         }
         ToolbarItem(placement: .topBarLeading) {
@@ -126,6 +227,24 @@ struct LibraryView: View {
                         .foregroundStyle(Theme.Color.textSecondary)
                 }
             }
+        }
+    }
+
+    private func enterSelectionMode() {
+        isSelecting = true
+        selectedClipIDs = []
+    }
+
+    private func exitSelectionMode() {
+        isSelecting = false
+        selectedClipIDs = []
+    }
+
+    private func toggleSelection(_ clip: DanceClip) {
+        if selectedClipIDs.contains(clip.id) {
+            selectedClipIDs.remove(clip.id)
+        } else {
+            selectedClipIDs.insert(clip.id)
         }
     }
 
@@ -251,21 +370,61 @@ struct LibraryView: View {
         }
         return "Clip \(identifier.prefix(6))"
     }
+
+    // MARK: - Delete
+
+    private func commitDelete(_ target: DeleteConfirmation) {
+        switch target {
+        case .single(let clip):
+            modelContext.delete(clip)
+        case .bulk(let clips):
+            for clip in clips {
+                modelContext.delete(clip)
+            }
+            exitSelectionMode()
+        }
+        try? modelContext.save()
+        deleteConfirmation = nil
+    }
 }
 
 // MARK: - Cell
 
+enum CellSelectionState {
+    case hidden
+    case selected
+    case unselected
+}
+
 private struct LibraryCell: View {
     let clip: DanceClip
+    var selectionState: CellSelectionState = .hidden
+    var onEdit: (() -> Void)?
+    var onDelete: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack {
                 Theme.Color.surfaceElevated
                 thumbnail
+                if selectionState == .selected {
+                    Theme.Color.accent.opacity(0.25)
+                }
                 VStack {
+                    HStack {
+                        if selectionState != .hidden {
+                            selectionIndicator
+                        }
+                        Spacer()
+                        if selectionState == .hidden, onEdit != nil || onDelete != nil {
+                            menuButton
+                        }
+                    }
                     Spacer()
                     HStack {
+                        if !clip.tags.isEmpty {
+                            tagChips
+                        }
                         Spacer()
                         durationBadge
                     }
@@ -274,6 +433,10 @@ private struct LibraryCell: View {
             }
             .frame(height: 180)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Metrics.cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Metrics.cornerRadius)
+                    .stroke(Theme.Color.accent, lineWidth: selectionState == .selected ? 2 : 0)
+            )
 
             Text(clip.title)
                 .font(Theme.Font.bodyEmphasized)
@@ -307,6 +470,52 @@ private struct LibraryCell: View {
             .padding(.vertical, 2)
             .background(Color.black.opacity(0.55), in: Capsule())
     }
+
+    private var selectionIndicator: some View {
+        Image(systemName: selectionState == .selected ? "checkmark.circle.fill" : "circle")
+            .font(.system(size: 22))
+            .foregroundStyle(selectionState == .selected ? Theme.Color.accent : Color.white.opacity(0.85))
+            .shadow(color: .black.opacity(0.4), radius: 2, x: 0, y: 1)
+    }
+
+    private var menuButton: some View {
+        Menu {
+            if let onEdit {
+                Button {
+                    onEdit()
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+            }
+            if let onDelete {
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Color.white)
+                .frame(width: 28, height: 28)
+                .background(Color.black.opacity(0.55), in: Circle())
+        }
+        .menuStyle(.borderlessButton)
+    }
+
+    private var tagChips: some View {
+        HStack(spacing: 3) {
+            ForEach(clip.tags.prefix(3)) { tag in
+                Circle()
+                    .fill(Color(tagHex: tag.colorHex))
+                    .frame(width: 6, height: 6)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(Color.black.opacity(0.55), in: Capsule())
+    }
 }
 
 // MARK: - Tag filter bar
@@ -321,7 +530,7 @@ private struct TagFilterBar: View {
             HStack(spacing: 8) {
                 ForEach(tags) { tag in
                     let isSelected = selected.contains(tag.id)
-                    let accent = Color(hex: UInt32(tag.colorHex.stripHex, radix: 16) ?? 0xFF3B7F)
+                    let accent = Color(tagHex: tag.colorHex)
                     Button {
                         if isSelected {
                             selected.remove(tag.id)
@@ -356,14 +565,6 @@ private struct TagFilterBar: View {
     }
 }
 
-private extension String {
-    /// Strips a leading `#` and returns the hex remainder suitable for
-    /// `Int(_:radix:)` parsing.
-    var stripHex: Substring {
-        hasPrefix("#") ? dropFirst() : Substring(self)
-    }
-}
-
 // MARK: - Formatting
 
 enum LibraryFormatter {
@@ -393,6 +594,29 @@ enum LibraryError: Error, LocalizedError {
         switch self {
         case .missingAssetIdentifier: "The selected item has no asset identifier."
         }
+    }
+}
+
+enum DeleteConfirmation: Identifiable {
+    case single(DanceClip)
+    case bulk([DanceClip])
+
+    var id: String {
+        switch self {
+        case .single(let clip): "single-\(clip.id)"
+        case .bulk(let clips): "bulk-" + clips.map(\.id.uuidString).joined(separator: ",")
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .single: "Delete this clip?"
+        case .bulk(let clips): "Delete \(clips.count) clip\(clips.count == 1 ? "" : "s")?"
+        }
+    }
+
+    var message: String {
+        "The video itself stays in Photos — only StepBack's reference to it is removed."
     }
 }
 
