@@ -31,6 +31,10 @@ targets:
       path: StepBack/Generated-Info.plist
       properties:
         CFBundleDisplayName: StepBack
+        NSPhotoLibraryUsageDescription: "StepBack needs access to your videos so you can practice with them."
+        NSPhotoLibraryAddUsageDescription: "StepBack saves ghost-overlay recordings back to your Photos library."
+        NSCameraUsageDescription: "StepBack uses the camera to record ghost-overlay practice clips."
+        NSMicrophoneUsageDescription: "StepBack records audio alongside ghost-overlay practice clips."
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:
@@ -46,11 +50,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.stepback.app
         TARGETED_DEVICE_FAMILY: "1,2"
-        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "StepBack needs access to your videos so you can practice with them."
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        CODE_SIGN_STYLE: Automatic
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: "0.1.0"
         CODE_SIGN_STYLE: Automatic
         CURRENT_PROJECT_VERSION: 1
         MARKETING_VERSION: "0.1.0"
