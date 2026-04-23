@@ -26,28 +26,40 @@ struct ZoomablePlayerContainer<Content: View>: View {
 
     var body: some View {
         GeometryReader { proxy in
-            content
-                .frame(width: proxy.size.width, height: proxy.size.height)
-                .scaleEffect(scale, anchor: .center)
-                .offset(offset)
-                .frame(width: proxy.size.width, height: proxy.size.height)
-                .contentShape(Rectangle())
-                .gesture(
-                    SimultaneousGesture(magnifyGesture(in: proxy.size), panGesture(in: proxy.size))
-                )
-                .onTapGesture(count: 2) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        if scale > minScale + 0.001 {
-                            scale = minScale
-                            offset = .zero
-                        } else {
-                            scale = doubleTapZoom
-                            offset = .zero
+            ZStack {
+                // The video itself. allowsHitTesting(false) lets UIKit's
+                // default touch-swallowing step out of the way so SwiftUI
+                // gestures on the overlay actually fire.
+                content
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .scaleEffect(scale, anchor: .center)
+                    .offset(offset)
+                    .allowsHitTesting(false)
+
+                // Transparent gesture surface sitting on top of the video.
+                Color.clear
+                    .contentShape(Rectangle())
+                    .gesture(
+                        SimultaneousGesture(
+                            magnifyGesture(in: proxy.size),
+                            panGesture(in: proxy.size)
+                        )
+                    )
+                    .onTapGesture(count: 2) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            if scale > minScale + 0.001 {
+                                scale = minScale
+                                offset = .zero
+                            } else {
+                                scale = doubleTapZoom
+                                offset = .zero
+                            }
+                            baseScale = scale
+                            baseOffset = offset
                         }
-                        baseScale = scale
-                        baseOffset = offset
                     }
-                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .clipped()
     }
