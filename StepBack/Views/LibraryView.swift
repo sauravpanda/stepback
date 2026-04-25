@@ -44,6 +44,9 @@ struct LibraryView: View {
                     pickerItems = []
                     Task { await importClips(items) }
                 }
+                .task {
+                    _ = await photosService.requestAuthorization()
+                }
         }
     }
 
@@ -131,7 +134,8 @@ struct LibraryView: View {
             selection: $pickerItems,
             maxSelectionCount: 50,
             matching: .videos,
-            preferredItemEncoding: .current
+            preferredItemEncoding: .current,
+            photoLibrary: .shared()
         ) {
             Label("Import", systemImage: "plus")
                 .labelStyle(.iconOnly)

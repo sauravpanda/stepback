@@ -20,6 +20,14 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>StepBack needs access to your videos so you can practice with them.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>StepBack saves ghost-overlay recordings back to your Photos library.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>StepBack uses the camera to record ghost-overlay practice clips.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>StepBack records audio alongside ghost-overlay practice clips.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
