@@ -217,6 +217,7 @@ final class PracticePlayerViewModel: ObservableObject {
         if let end = loopEnd, end <= currentTime {
             loopEnd = nil
         }
+        activeSegmentID = nil
     }
 
     func markLoopEnd() {
@@ -225,11 +226,13 @@ final class PracticePlayerViewModel: ObservableObject {
             return
         }
         loopEnd = currentTime
+        activeSegmentID = nil
     }
 
     func clearLoop() {
         loopStart = nil
         loopEnd = nil
+        activeSegmentID = nil
     }
 
     func applyMarker(_ marker: LoopMarker) {
@@ -237,6 +240,27 @@ final class PracticePlayerViewModel: ObservableObject {
         loopEnd = marker.endSeconds
         setSpeed(marker.preferredSpeed)
         seek(to: marker.startSeconds)
+    }
+
+    // MARK: - Segments
+
+    @Published private(set) var activeSegmentID: UUID?
+
+    /// Plays a segment by clamping the loop region to its bounds and starting
+    /// playback at its start. Reuses the same loop machinery as A/B so the
+    /// existing `LoopEvaluator` keeps it bounded automatically.
+    func playSegment(_ segment: ClipSegment) {
+        activeSegmentID = segment.id
+        loopStart = segment.startSeconds
+        loopEnd = segment.endSeconds
+        setSpeed(segment.preferredSpeed)
+        seek(to: segment.startSeconds)
+        play()
+    }
+
+    func clearActiveSegment() {
+        activeSegmentID = nil
+        clearLoop()
     }
 
     // MARK: - Observers

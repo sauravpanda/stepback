@@ -19,6 +19,6 @@ struct StepBackApp: App {
         WindowGroup {
             RootView()
         }
-        .modelContainer(for: [DanceClip.self, Tag.self, LoopMarker.self])
+        .modelContainer(for: [DanceClip.self, Tag.self, LoopMarker.self, ClipSegment.self])
     }
 }
