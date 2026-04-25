@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		03C973FD27336E9DD2EDE507 /* PracticeBeatUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC6BAE20433D2ED45F00AD41 /* PracticeBeatUI.swift */; };
 		1724638BD2B70699A591FE9B /* AutoTagService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99CA1B5B91B8D4637FEEF872 /* AutoTagService.swift */; };
+		1D0BE1897582A939153E6CE8 /* ClipEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D25E6771271EDD5B867F61E /* ClipEditView.swift */; };
 		1EC09265A1CD5B1E67415B39 /* StepBackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023608F63978F9D1668F5AFC /* StepBackApp.swift */; };
 		1F02ADF6471B01E48A824A49 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6745FF48B10D28A5ED4BB568 /* Models.swift */; };
 		2B90619AE0B5262B774DEAC1 /* PracticeControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35987D9825155E131A40950 /* PracticeControls.swift */; };
@@ -62,6 +63,7 @@
 		7093A077C0A2C139BD7BDD29 /* BeatGridTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatGridTests.swift; sourceTree = "<group>"; };
 		848D52E156E709AA0226CEE8 /* ModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsTests.swift; sourceTree = "<group>"; };
 		8B4B3FD6B0A004C787FC243B /* LibraryFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFormatterTests.swift; sourceTree = "<group>"; };
+		8D25E6771271EDD5B867F61E /* ClipEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditView.swift; sourceTree = "<group>"; };
 		90115F7F368CDD3B0832B3B3 /* Generated-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Generated-Info.plist"; sourceTree = "<group>"; };
 		92D24FDCCE45AEFB352C5EBF /* CompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareView.swift; sourceTree = "<group>"; };
 		99CA1B5B91B8D4637FEEF872 /* AutoTagService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoTagService.swift; sourceTree = "<group>"; };
@@ -97,6 +99,7 @@
 		2BAE89F5B3212B0E382D6904 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				8D25E6771271EDD5B867F61E /* ClipEditView.swift */,
 				92D24FDCCE45AEFB352C5EBF /* CompareView.swift */,
 				AAB30650146433E889DC2AF4 /* LibraryView.swift */,
 				CC6BAE20433D2ED45F00AD41 /* PracticeBeatUI.swift */,
@@ -268,6 +271,7 @@
 				1724638BD2B70699A591FE9B /* AutoTagService.swift in Sources */,
 				E9E06DF791FF47015B3DDFA8 /* BeatDetector.swift in Sources */,
 				691A3AE86C110C252A1412FE /* BeatGrid.swift in Sources */,
+				1D0BE1897582A939153E6CE8 /* ClipEditView.swift in Sources */,
 				B6CB4CFDF1EB16757B0D78AA /* CompareView.swift in Sources */,
 				A88000A1ACD9503F7A9D6143 /* LibraryView.swift in Sources */,
 				1F02ADF6471B01E48A824A49 /* Models.swift in Sources */,
