@@ -13,6 +13,7 @@ struct PracticeView: View {
     @State private var markerSheetPresented = false
     @State private var splitSheetPresented = false
     @State private var editingSegment: ClipSegment?
+    @State private var trimSheetPresented = false
     @State private var comparePickerPresented = false
     @State private var compareSecondary: DanceClip?
     @State private var editSheetPresented = false
@@ -20,7 +21,10 @@ struct PracticeView: View {
     init(clip: DanceClip) {
         self.clip = clip
         _vm = StateObject(
-            wrappedValue: PracticePlayerViewModel(assetIdentifier: clip.assetIdentifier)
+            wrappedValue: PracticePlayerViewModel(
+                assetIdentifier: clip.assetIdentifier,
+                localFileURL: clip.trimmedFileURL
+            )
         )
     }
 
@@ -43,6 +47,14 @@ struct PracticeView: View {
                             .foregroundStyle(Theme.Color.textPrimary)
                     }
                     .accessibilityLabel("Edit clip")
+                    Button {
+                        vm.pause()
+                        trimSheetPresented = true
+                    } label: {
+                        Image(systemName: "crop")
+                            .foregroundStyle(Theme.Color.textPrimary)
+                    }
+                    .accessibilityLabel("Trim clip")
                     Button {
                         comparePickerPresented = true
                     } label: {
@@ -93,6 +105,12 @@ struct PracticeView: View {
                 saveSegment(title: title, preferredSpeed: speed)
             }
             .presentationDetents([.medium])
+        }
+        .fullScreenCover(isPresented: $trimSheetPresented, onDismiss: {
+            // After a trim the underlying file has changed; rebind the player.
+            Task { await vm.reloadAsset(localFileURL: clip.trimmedFileURL) }
+        }) {
+            TrimView(clip: clip)
         }
         .sheet(item: $editingSegment) { segment in
             SegmentEditSheet(

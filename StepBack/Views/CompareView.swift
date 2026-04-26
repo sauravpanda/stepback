@@ -19,10 +19,16 @@ struct CompareView: View {
         self.primaryClip = primary
         self.secondaryClip = secondary
         _primary = StateObject(
-            wrappedValue: PracticePlayerViewModel(assetIdentifier: primary.assetIdentifier)
+            wrappedValue: PracticePlayerViewModel(
+                assetIdentifier: primary.assetIdentifier,
+                localFileURL: primary.trimmedFileURL
+            )
         )
         _secondary = StateObject(
-            wrappedValue: PracticePlayerViewModel(assetIdentifier: secondary.assetIdentifier)
+            wrappedValue: PracticePlayerViewModel(
+                assetIdentifier: secondary.assetIdentifier,
+                localFileURL: secondary.trimmedFileURL
+            )
         )
     }
 

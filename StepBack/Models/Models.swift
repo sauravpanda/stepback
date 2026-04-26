@@ -18,6 +18,12 @@ final class DanceClip: Equatable, Hashable {
     var firstDownbeatSeconds: Double?
     var beatsPerMeasure: Int = 4
 
+    /// Filename (in `TrimStorage.directory`) for a sandboxed trimmed copy of
+    /// the original asset. When non-nil, playback resolves to this file
+    /// instead of the PHAsset, so trims survive the user deleting the
+    /// original from Photos.
+    var trimmedFileName: String?
+
     @Relationship(deleteRule: .cascade, inverse: \LoopMarker.clip)
     var loopMarkers: [LoopMarker] = []
 
@@ -73,6 +79,12 @@ final class DanceClip: Equatable, Hashable {
 
     var hasBeatAnalysis: Bool {
         bpm != nil && beatTimesData != nil
+    }
+
+    /// Resolved sandbox URL for a trimmed copy, when one exists.
+    var trimmedFileURL: URL? {
+        guard let trimmedFileName else { return nil }
+        return TrimStorage.fileURL(name: trimmedFileName)
     }
 }
 
