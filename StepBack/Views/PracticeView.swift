@@ -47,7 +47,11 @@ struct PracticeView: View {
                     }
                     .accessibilityLabel("Edit clip")
                     Button {
+                        // Park the parent VM in a neutral state — loop bounds and
+                        // segment selection would fight TrimView's own seeking
+                        // since they share an AVPlayer.
                         vm.pause()
+                        vm.clearLoop()
                         trimSheetPresented = true
                     } label: {
                         Image(systemName: "crop")
@@ -100,7 +104,7 @@ struct PracticeView: View {
             // After a trim the underlying file has changed; rebind the player.
             Task { await vm.reloadAsset(localFileURL: clip.trimmedFileURL) }
         }) {
-            TrimView(clip: clip)
+            TrimView(clip: clip, player: vm.player, initialDuration: vm.duration)
         }
         .sheet(item: $editingSegment) { segment in
             SegmentEditSheet(

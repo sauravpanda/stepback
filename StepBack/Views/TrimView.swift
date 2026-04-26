@@ -4,32 +4,37 @@ import SwiftData
 import SwiftUI
 import UIKit
 
-/// Modal trim editor. Plays the clip muted in a loop within the chosen
-/// [start, end] window so the user can audition the trim, then exports
-/// the range to the sandbox and rebases all annotations on the new
-/// timeline.
+/// Modal trim editor. Shares the parent practice screen's `AVPlayer` so we
+/// don't double the in-memory video buffers — long clips on a phone will
+/// blow past the per-process limit fast if two players are decoding the
+/// same source.
+///
+/// Picks a [start, end] window with two handles, then exports the range
+/// to the sandbox and rebases all annotations on the new timeline.
 struct TrimView: View {
 
     let clip: DanceClip
+    let player: AVPlayer
+    let initialDuration: Double
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    @StateObject private var preview: PracticePlayerViewModel
+    @State private var duration: Double
+    @State private var currentTime: Double = 0
+    @State private var isPlaying: Bool = false
     @State private var trimStart: Double = 0
-    @State private var trimEnd: Double = 0
+    @State private var trimEnd: Double
     @State private var isExporting = false
     @State private var exportError: String?
-    @State private var hasInitializedHandles = false
+    @State private var timeObserver: Any?
 
-    init(clip: DanceClip) {
+    init(clip: DanceClip, player: AVPlayer, initialDuration: Double) {
         self.clip = clip
-        _preview = StateObject(
-            wrappedValue: PracticePlayerViewModel(
-                assetIdentifier: clip.assetIdentifier,
-                localFileURL: clip.trimmedFileURL
-            )
-        )
+        self.player = player
+        self.initialDuration = initialDuration
+        _duration = State(initialValue: initialDuration)
+        _trimEnd = State(initialValue: initialDuration)
     }
 
     var body: some View {
@@ -53,68 +58,51 @@ struct TrimView: View {
                 }
             }
         }
-        .task { await preview.load() }
-        .onChange(of: preview.duration) { _, newDuration in
-            if !hasInitializedHandles, newDuration > 0 {
-                trimStart = 0
-                trimEnd = newDuration
-                hasInitializedHandles = true
-                preview.seek(to: 0)
-            }
+        .onAppear {
+            seek(to: 0)
+            attachTimeObserver()
         }
-        .onChange(of: preview.currentTime) { _, t in
-            // Loop preview within the chosen window.
-            if t >= trimEnd, preview.duration > 0 {
-                preview.seek(to: trimStart)
-            }
-        }
+        .onDisappear { detachTimeObserver() }
         .preferredColorScheme(.dark)
     }
 
     // MARK: - Content
 
-    @ViewBuilder
     private var content: some View {
-        if let error = preview.loadError {
-            errorState(message: error)
-        } else if !preview.isReady {
-            ProgressView().tint(Theme.Color.accent)
-        } else {
-            VStack(spacing: 16) {
-                videoPanel
-                handles
-                preset
-                if let exportError {
-                    Text(exportError)
-                        .font(Theme.Font.caption)
-                        .foregroundStyle(.red.opacity(0.9))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 16)
-                }
-                if isExporting {
-                    HStack(spacing: 8) {
-                        ProgressView().tint(Theme.Color.accent)
-                        Text("Exporting…")
-                            .font(Theme.Font.caption)
-                            .foregroundStyle(Theme.Color.textSecondary)
-                    }
-                }
-                Spacer(minLength: 0)
+        VStack(spacing: 16) {
+            videoPanel
+            handles
+            preset
+            if let exportError {
+                Text(exportError)
+                    .font(Theme.Font.caption)
+                    .foregroundStyle(.red.opacity(0.9))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
             }
-            .padding(.top, 8)
+            if isExporting {
+                HStack(spacing: 8) {
+                    ProgressView().tint(Theme.Color.accent)
+                    Text("Exporting…")
+                        .font(Theme.Font.caption)
+                        .foregroundStyle(Theme.Color.textSecondary)
+                }
+            }
+            Spacer(minLength: 0)
         }
+        .padding(.top, 8)
     }
 
     private var videoPanel: some View {
-        TrimPlayerSurface(player: preview.player)
+        TrimPlayerSurface(player: player)
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .background(Color.black)
             .overlay(alignment: .bottom) {
                 HStack {
                     Button {
-                        preview.togglePlayPause()
+                        togglePlayPause()
                     } label: {
-                        Image(systemName: preview.isPlaying ? "pause.fill" : "play.fill")
+                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.black)
                             .frame(width: 36, height: 36)
@@ -122,7 +110,7 @@ struct TrimView: View {
                     }
                     .buttonStyle(.plain)
                     Spacer()
-                    Text("\(SpeedFormatter.timestamp(preview.currentTime)) / \(SpeedFormatter.timestamp(preview.duration))")
+                    Text("\(SpeedFormatter.timestamp(currentTime)) / \(SpeedFormatter.timestamp(duration))")
                         .font(Theme.Font.timestamp)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
@@ -136,20 +124,20 @@ struct TrimView: View {
     private var handles: some View {
         VStack(spacing: 10) {
             TrimRangeBar(
-                duration: max(preview.duration, 0.001),
-                currentTime: preview.currentTime,
+                duration: max(duration, 0.001),
+                currentTime: currentTime,
                 trimStart: $trimStart,
                 trimEnd: $trimEnd,
-                onSeek: { preview.seek(to: $0) }
+                onSeek: { seek(to: $0) }
             )
             HStack {
                 rangeChip(
                     label: "Start",
                     value: trimStart,
                     set: {
-                        trimStart = preview.currentTime
+                        trimStart = currentTime
                         if trimEnd <= trimStart + 0.05 {
-                            trimEnd = min(preview.duration, trimStart + 0.5)
+                            trimEnd = min(duration, trimStart + 0.5)
                         }
                     }
                 )
@@ -162,7 +150,7 @@ struct TrimView: View {
                     label: "End",
                     value: trimEnd,
                     set: {
-                        trimEnd = preview.currentTime
+                        trimEnd = currentTime
                         if trimStart >= trimEnd - 0.05 {
                             trimStart = max(0, trimEnd - 0.5)
                         }
@@ -179,7 +167,7 @@ struct TrimView: View {
             Text("Heads up")
                 .font(.system(.footnote, design: .rounded, weight: .semibold))
                 .foregroundStyle(Theme.Color.textSecondary)
-            Text("Trimming replaces the clip's source with a new file. Patterns, loops, and beat times are kept and shifted to the new timeline; anything outside the kept window is dropped.")
+            Text("Trimming replaces the clip's source with a new file. Patterns and beat times are kept and shifted to the new timeline; anything outside the kept window is dropped.")
                 .font(Theme.Font.caption)
                 .foregroundStyle(Theme.Color.textTertiary)
         }
@@ -206,36 +194,61 @@ struct TrimView: View {
         .buttonStyle(.plain)
     }
 
-    private func errorState(message: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 36, weight: .light))
-                .foregroundStyle(Theme.Color.accent)
-            Text("Couldn't load this clip")
-                .font(Theme.Font.title)
-                .foregroundStyle(Theme.Color.textPrimary)
-            Text(message)
-                .font(Theme.Font.caption)
-                .foregroundStyle(Theme.Color.textSecondary)
-                .multilineTextAlignment(.center)
+    // MARK: - Transport
+
+    private func togglePlayPause() {
+        if isPlaying {
+            player.pause()
+            isPlaying = false
+        } else {
+            player.play()
+            isPlaying = true
         }
-        .padding()
+    }
+
+    private func seek(to seconds: Double) {
+        let clamped = max(0, min(seconds, duration))
+        let time = CMTime(seconds: clamped, preferredTimescale: 600)
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        currentTime = clamped
+    }
+
+    private func attachTimeObserver() {
+        let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
+        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+            let seconds = time.seconds
+            guard seconds.isFinite else { return }
+            currentTime = max(0, min(seconds, duration))
+            isPlaying = player.rate > 0
+            if seconds >= trimEnd, duration > 0 {
+                player.seek(to: CMTime(seconds: trimStart, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+            }
+        }
+    }
+
+    private func detachTimeObserver() {
+        if let timeObserver {
+            player.removeTimeObserver(timeObserver)
+        }
+        timeObserver = nil
+        player.pause()
     }
 
     // MARK: - Apply
 
     private var canApply: Bool {
-        preview.duration > 0
+        duration > 0
             && trimEnd - trimStart > 0.05
-            && (trimStart > 0.05 || trimEnd < preview.duration - 0.05)
+            && (trimStart > 0.05 || trimEnd < duration - 0.05)
     }
 
     private func applyTrim() async {
-        guard let asset = preview.player.currentItem?.asset else {
+        guard let asset = player.currentItem?.asset else {
             exportError = "Clip isn't ready yet."
             return
         }
-        preview.pause()
+        player.pause()
+        isPlaying = false
         isExporting = true
         exportError = nil
         do {
@@ -254,15 +267,12 @@ struct TrimView: View {
     }
 
     private func applyToModel(fileName: String, newDuration: Double) {
-        // Drop the old trimmed file (if this clip was trimmed before) so we
-        // don't leak the previous sandbox file when the new one supersedes it.
         if let previous = clip.trimmedFileName {
             TrimStorage.deleteIfExists(name: previous)
         }
         clip.trimmedFileName = fileName
         clip.durationSeconds = newDuration
 
-        // Shift annotations onto the new timeline.
         let start = trimStart
         let end = trimEnd
         clip.firstDownbeatSeconds = clip.firstDownbeatSeconds.flatMap {
@@ -341,12 +351,10 @@ private struct TrimRangeBar: View {
             let playX = xFor(time: currentTime, width: width)
 
             ZStack(alignment: .leading) {
-                // Track.
                 Capsule()
                     .fill(Theme.Color.surfaceElevated)
                     .frame(height: 8)
 
-                // Trimmed-out shaded regions.
                 Rectangle()
                     .fill(Color.black.opacity(0.45))
                     .frame(width: max(0, startX), height: 30)
@@ -355,19 +363,16 @@ private struct TrimRangeBar: View {
                     .frame(width: max(0, width - endX), height: 30)
                     .offset(x: endX)
 
-                // Selected window.
                 Capsule()
                     .fill(Theme.Color.accentSoft)
                     .frame(width: max(2, endX - startX), height: 12)
                     .offset(x: startX)
 
-                // Playhead.
                 Rectangle()
                     .fill(.white)
                     .frame(width: 2, height: 28)
                     .offset(x: max(0, playX - 1))
 
-                // Start handle.
                 handleView()
                     .offset(x: max(0, startX - handleWidth / 2))
                     .gesture(
@@ -379,7 +384,6 @@ private struct TrimRangeBar: View {
                             }
                     )
 
-                // End handle.
                 handleView()
                     .offset(x: max(0, endX - handleWidth / 2))
                     .gesture(
