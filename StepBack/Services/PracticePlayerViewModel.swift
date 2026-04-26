@@ -261,13 +261,6 @@ final class PracticePlayerViewModel: ObservableObject {
         activeSegmentID = nil
     }
 
-    func applyMarker(_ marker: LoopMarker) {
-        loopStart = marker.startSeconds
-        loopEnd = marker.endSeconds
-        setSpeed(marker.preferredSpeed)
-        seek(to: marker.startSeconds)
-    }
-
     // MARK: - Segments
 
     @Published private(set) var activeSegmentID: UUID?

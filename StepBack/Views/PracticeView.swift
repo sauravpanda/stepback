@@ -10,7 +10,6 @@ struct PracticeView: View {
 
     @Environment(\.modelContext) private var modelContext
     @StateObject private var vm: PracticePlayerViewModel
-    @State private var markerSheetPresented = false
     @State private var splitSheetPresented = false
     @State private var editingSegment: ClipSegment?
     @State private var trimSheetPresented = false
@@ -83,15 +82,6 @@ struct PracticeView: View {
         }
         .navigationDestination(item: $compareSecondary) { secondary in
             CompareView(primary: clip, secondary: secondary)
-        }
-        .sheet(isPresented: $markerSheetPresented) {
-            SaveMarkerSheet(
-                defaultSpeed: vm.speed,
-                defaultRegion: (vm.loopStart ?? 0, vm.loopEnd ?? 0)
-            ) { label, speed in
-                saveMarker(label: label, speed: speed)
-            }
-            .presentationDetents([.medium])
         }
         .sheet(isPresented: $editSheetPresented) {
             ClipEditView(clip: clip)
@@ -241,11 +231,6 @@ struct PracticeView: View {
                 Spacer()
             }
             SpeedPills(selected: vm.speed, onSelect: vm.setSpeed(_:))
-            MarkerList(
-                markers: clip.loopMarkers.sorted { $0.startSeconds < $1.startSeconds },
-                onApply: vm.applyMarker,
-                onDelete: deleteMarker
-            )
             SegmentList(
                 segments: clip.segments.sorted { ($0.orderIndex, $0.startSeconds) < ($1.orderIndex, $1.startSeconds) },
                 activeID: vm.activeSegmentID,
@@ -286,17 +271,6 @@ struct PracticeView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Save A–B as new pattern")
-                Button {
-                    markerSheetPresented = true
-                } label: {
-                    Label("Loop", systemImage: "bookmark.fill")
-                        .font(.system(.footnote, design: .rounded, weight: .semibold))
-                        .foregroundStyle(Theme.Color.accent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Theme.Color.accentSoft, in: Capsule())
-                }
-                .buttonStyle(.plain)
             }
             if vm.loopStart != nil || vm.loopEnd != nil {
                 Button {
@@ -316,24 +290,6 @@ struct PracticeView: View {
 // MARK: - Persistence + command helpers
 
 extension PracticeView {
-    fileprivate func saveMarker(label: String, speed: Double) {
-        guard let start = vm.loopStart, let end = vm.loopEnd, end > start else { return }
-        let marker = LoopMarker(
-            label: label,
-            startSeconds: start,
-            endSeconds: end,
-            preferredSpeed: speed,
-            clip: clip
-        )
-        modelContext.insert(marker)
-        try? modelContext.save()
-    }
-
-    fileprivate func deleteMarker(_ marker: LoopMarker) {
-        modelContext.delete(marker)
-        try? modelContext.save()
-    }
-
     fileprivate func saveSegment(title: String, preferredSpeed: Double) {
         guard let start = vm.loopStart, let end = vm.loopEnd, end > start else { return }
         let nextIndex = (clip.segments.map(\.orderIndex).max() ?? -1) + 1
@@ -536,129 +492,6 @@ private struct LoopButton: View {
             }
         }
         .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Markers
-
-private struct MarkerList: View {
-    let markers: [LoopMarker]
-    let onApply: (LoopMarker) -> Void
-    let onDelete: (LoopMarker) -> Void
-
-    var body: some View {
-        if markers.isEmpty {
-            EmptyView()
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(markers) { marker in
-                        MarkerChip(marker: marker, onApply: onApply, onDelete: onDelete)
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-        }
-    }
-}
-
-private struct MarkerChip: View {
-    let marker: LoopMarker
-    let onApply: (LoopMarker) -> Void
-    let onDelete: (LoopMarker) -> Void
-
-    var body: some View {
-        Button {
-            onApply(marker)
-        } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(marker.label)
-                    .font(.system(.footnote, design: .rounded, weight: .semibold))
-                    .foregroundStyle(Theme.Color.textPrimary)
-                    .lineLimit(1)
-                HStack(spacing: 4) {
-                    Text(SpeedFormatter.timestamp(marker.startSeconds))
-                    Text("–")
-                    Text(SpeedFormatter.timestamp(marker.endSeconds))
-                    Text("·")
-                    Text(SpeedFormatter.pill(marker.preferredSpeed))
-                }
-                .font(Theme.Font.timestamp)
-                .foregroundStyle(Theme.Color.textTertiary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Theme.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: 10))
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
-            Button(role: .destructive) {
-                onDelete(marker)
-            } label: {
-                Label("Delete marker", systemImage: "trash")
-            }
-        }
-    }
-}
-
-// MARK: - Save marker sheet
-
-private struct SaveMarkerSheet: View {
-    let defaultSpeed: Double
-    let defaultRegion: (start: Double, end: Double)
-    let onSave: (String, Double) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var label: String = ""
-    @State private var speed: Double
-
-    init(
-        defaultSpeed: Double,
-        defaultRegion: (start: Double, end: Double),
-        onSave: @escaping (String, Double) -> Void
-    ) {
-        self.defaultSpeed = defaultSpeed
-        self.defaultRegion = defaultRegion
-        self.onSave = onSave
-        _speed = State(initialValue: defaultSpeed)
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Name") {
-                    TextField("Hard 8-count", text: $label)
-                }
-                Section("Region") {
-                    LabeledContent("Start", value: SpeedFormatter.timestamp(defaultRegion.start))
-                        .foregroundStyle(Theme.Color.textSecondary)
-                    LabeledContent("End", value: SpeedFormatter.timestamp(defaultRegion.end))
-                        .foregroundStyle(Theme.Color.textSecondary)
-                }
-                Section("Preferred speed") {
-                    SpeedPills(selected: speed, onSelect: { speed = $0 })
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .listRowBackground(Color.clear)
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(Theme.Color.background)
-            .navigationTitle("Save loop")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
-                        onSave(trimmed.isEmpty ? "Marker" : trimmed, speed)
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .preferredColorScheme(.dark)
     }
 }
 

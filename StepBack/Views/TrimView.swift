@@ -272,20 +272,6 @@ struct TrimView: View {
             TrimAnnotationShifter.shiftBeatTimes(clip.beatTimes, trimStart: start, trimEnd: end)
         )
 
-        for marker in clip.loopMarkers {
-            if let shifted = TrimAnnotationShifter.shiftRange(
-                start: marker.startSeconds,
-                end: marker.endSeconds,
-                trimStart: start,
-                trimEnd: end
-            ) {
-                marker.startSeconds = shifted.start
-                marker.endSeconds = shifted.end
-            } else {
-                modelContext.delete(marker)
-            }
-        }
-
         for segment in clip.segments {
             if let shifted = TrimAnnotationShifter.shiftRange(
                 start: segment.startSeconds,

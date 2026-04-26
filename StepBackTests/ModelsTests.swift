@@ -11,7 +11,7 @@ final class ModelsTests: XCTestCase {
     override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
-            for: DanceClip.self, Tag.self, LoopMarker.self,
+            for: DanceClip.self, Tag.self, ClipSegment.self,
             configurations: config
         )
     }
@@ -33,8 +33,9 @@ final class ModelsTests: XCTestCase {
         XCTAssertNil(clip.eventName)
         XCTAssertNil(clip.thumbnailData)
         XCTAssertEqual(clip.durationSeconds, 0)
-        XCTAssertTrue(clip.loopMarkers.isEmpty)
+        XCTAssertTrue(clip.segments.isEmpty)
         XCTAssertTrue(clip.tags.isEmpty)
+        XCTAssertNil(clip.trimmedFileName)
 
         // Beat analysis defaults
         XCTAssertNil(clip.bpm)
@@ -75,35 +76,35 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(clip.beatTimes, [])
     }
 
-    // MARK: - LoopMarker
+    // MARK: - ClipSegment
 
-    func testLoopMarkerRelationshipAndCascadeDelete() throws {
+    func testClipSegmentRelationshipAndCascadeDelete() throws {
         let clip = DanceClip(title: "Practice", assetIdentifier: "ASSET-2")
-        let marker = LoopMarker(
-            label: "Hard 8-count",
+        let segment = ClipSegment(
+            title: "Basic step",
             startSeconds: 10,
             endSeconds: 18,
             preferredSpeed: 0.5,
             clip: clip
         )
-        clip.loopMarkers.append(marker)
+        clip.segments.append(segment)
         context.insert(clip)
         try context.save()
 
-        XCTAssertEqual(clip.loopMarkers.count, 1)
-        XCTAssertIdentical(marker.clip, clip)
-        XCTAssertEqual(marker.durationSeconds, 8, accuracy: 0.0001)
+        XCTAssertEqual(clip.segments.count, 1)
+        XCTAssertIdentical(segment.clip, clip)
+        XCTAssertEqual(segment.durationSeconds, 8, accuracy: 0.0001)
 
         context.delete(clip)
         try context.save()
 
-        let remaining = try context.fetch(FetchDescriptor<LoopMarker>())
-        XCTAssertTrue(remaining.isEmpty, "Deleting the clip should cascade to its markers")
+        let remaining = try context.fetch(FetchDescriptor<ClipSegment>())
+        XCTAssertTrue(remaining.isEmpty, "Deleting the clip should cascade to its segments")
     }
 
-    func testLoopMarkerDurationNeverNegative() {
-        let marker = LoopMarker(label: "Weird", startSeconds: 10, endSeconds: 5)
-        XCTAssertEqual(marker.durationSeconds, 0)
+    func testClipSegmentDurationNeverNegative() {
+        let segment = ClipSegment(title: "Weird", startSeconds: 10, endSeconds: 5)
+        XCTAssertEqual(segment.durationSeconds, 0)
     }
 
     // MARK: - Tag

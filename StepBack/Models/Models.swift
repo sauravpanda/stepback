@@ -24,9 +24,6 @@ final class DanceClip: Equatable, Hashable {
     /// original from Photos.
     var trimmedFileName: String?
 
-    @Relationship(deleteRule: .cascade, inverse: \LoopMarker.clip)
-    var loopMarkers: [LoopMarker] = []
-
     @Relationship(deleteRule: .cascade, inverse: \ClipSegment.clip)
     var segments: [ClipSegment] = []
 
@@ -101,36 +98,6 @@ final class Tag {
         self.id = id
         self.name = name
         self.colorHex = colorHex
-    }
-}
-
-@Model
-final class LoopMarker {
-    var id: UUID
-    var label: String
-    var startSeconds: Double
-    var endSeconds: Double
-    var preferredSpeed: Double
-    var clip: DanceClip?
-
-    init(
-        id: UUID = UUID(),
-        label: String,
-        startSeconds: Double,
-        endSeconds: Double,
-        preferredSpeed: Double = 1.0,
-        clip: DanceClip? = nil
-    ) {
-        self.id = id
-        self.label = label
-        self.startSeconds = startSeconds
-        self.endSeconds = endSeconds
-        self.preferredSpeed = preferredSpeed
-        self.clip = clip
-    }
-
-    var durationSeconds: Double {
-        max(0, endSeconds - startSeconds)
     }
 }
 
