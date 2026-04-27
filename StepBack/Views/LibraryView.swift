@@ -431,6 +431,7 @@ private struct LibraryCell: View {
                 }
                 .padding(6)
             }
+            .frame(maxWidth: .infinity)
             .frame(height: 180)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Metrics.cornerRadius))
             .overlay(
@@ -455,6 +456,8 @@ private struct LibraryCell: View {
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
         } else {
             Image(systemName: "film")
                 .font(.system(size: 28, weight: .light))
