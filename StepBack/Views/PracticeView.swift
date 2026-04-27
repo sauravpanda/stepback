@@ -130,10 +130,12 @@ struct PracticeView: View {
                 .tint(Theme.Color.accent)
         } else {
             VStack(spacing: 0) {
-                PlayerSurface(player: vm.player)
-                    .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
-                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                    .background(Color.black)
+                ZoomablePlayerContainer {
+                    PlayerSurface(player: vm.player)
+                        .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
+                }
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                .background(Color.black)
                 controls
             }
         }
@@ -235,6 +237,12 @@ struct PracticeView: View {
                 Spacer()
             }
             SpeedPills(selected: vm.speed, onSelect: vm.setSpeed(_:))
+            SegmentList(
+                segments: clip.segments.sorted { ($0.orderIndex, $0.startSeconds) < ($1.orderIndex, $1.startSeconds) },
+                activeID: vm.activeSegmentID,
+                onPlay: vm.playSegment,
+                onEdit: { editingSegment = $0 }
+            )
             SegmentList(
                 segments: clip.segments.sorted { ($0.orderIndex, $0.startSeconds) < ($1.orderIndex, $1.startSeconds) },
                 activeID: vm.activeSegmentID,
