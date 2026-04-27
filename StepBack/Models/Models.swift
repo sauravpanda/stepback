@@ -21,6 +21,9 @@ final class DanceClip: Equatable, Hashable {
     @Relationship(deleteRule: .cascade, inverse: \LoopMarker.clip)
     var loopMarkers: [LoopMarker] = []
 
+    @Relationship(deleteRule: .cascade, inverse: \ClipSegment.clip)
+    var segments: [ClipSegment] = []
+
     var tags: [Tag] = []
 
     init(
@@ -116,5 +119,52 @@ final class LoopMarker {
 
     var durationSeconds: Double {
         max(0, endSeconds - startSeconds)
+    }
+}
+
+@Model
+final class ClipSegment: Equatable, Hashable {
+    var id: UUID
+    var title: String
+    var startSeconds: Double
+    var endSeconds: Double
+    var preferredSpeed: Double
+    var notes: String
+    var dateAdded: Date
+    var orderIndex: Int
+    var clip: DanceClip?
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        startSeconds: Double,
+        endSeconds: Double,
+        preferredSpeed: Double = 1.0,
+        notes: String = "",
+        dateAdded: Date = Date(),
+        orderIndex: Int = 0,
+        clip: DanceClip? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.startSeconds = startSeconds
+        self.endSeconds = endSeconds
+        self.preferredSpeed = preferredSpeed
+        self.notes = notes
+        self.dateAdded = dateAdded
+        self.orderIndex = orderIndex
+        self.clip = clip
+    }
+
+    var durationSeconds: Double {
+        max(0, endSeconds - startSeconds)
+    }
+
+    static func == (lhs: ClipSegment, rhs: ClipSegment) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }

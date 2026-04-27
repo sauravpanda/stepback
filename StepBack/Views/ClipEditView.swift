@@ -214,7 +214,7 @@ struct BulkMoveToGroupView: View {
 
 #Preview {
     let container = try! ModelContainer(
-        for: DanceClip.self, Tag.self, LoopMarker.self,
+        for: DanceClip.self, Tag.self, LoopMarker.self, ClipSegment.self,
         configurations: .init(isStoredInMemoryOnly: true)
     )
     let clip = DanceClip(title: "Sample", assetIdentifier: "preview")
