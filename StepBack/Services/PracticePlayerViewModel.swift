@@ -32,14 +32,17 @@ final class PracticePlayerViewModel: ObservableObject {
     private var playerItem: AVPlayerItem?
 
     private let assetIdentifier: String
+    private var localFileURL: URL?
     private let photosService: PhotosServicing
 
     init(
         assetIdentifier: String,
+        localFileURL: URL? = nil,
         photosService: PhotosServicing = PhotosService(),
         player: AVPlayer = AVPlayer()
     ) {
         self.assetIdentifier = assetIdentifier
+        self.localFileURL = localFileURL
         self.photosService = photosService
         self.player = player
         attachTimeObserver()
@@ -53,10 +56,33 @@ final class PracticePlayerViewModel: ObservableObject {
 
     // MARK: - Loading
 
+    /// Swaps the underlying source (e.g. after a trim writes a new file) and
+    /// reloads. Resets transport state so the user doesn't end up paused at
+    /// a timestamp that no longer exists in the new timeline.
+    func reloadAsset(localFileURL: URL?) async {
+        self.localFileURL = localFileURL
+        pause()
+        loopStart = nil
+        loopEnd = nil
+        activeSegmentID = nil
+        currentTime = 0
+        duration = 0
+        isReady = false
+        loadError = nil
+        player.replaceCurrentItem(with: nil)
+        playerItem = nil
+        await load()
+    }
+
     func load() async {
         guard !isReady else { return }
         do {
-            let urlAsset = try await photosService.resolveAVAsset(for: assetIdentifier)
+            let urlAsset: AVURLAsset
+            if let localFileURL {
+                urlAsset = AVURLAsset(url: localFileURL)
+            } else {
+                urlAsset = try await photosService.resolveAVAsset(for: assetIdentifier)
+            }
             let loadedDuration = try await urlAsset.load(.duration).seconds
             let item = AVPlayerItem(asset: urlAsset)
             item.audioTimePitchAlgorithm = .timeDomain
@@ -233,13 +259,6 @@ final class PracticePlayerViewModel: ObservableObject {
         loopStart = nil
         loopEnd = nil
         activeSegmentID = nil
-    }
-
-    func applyMarker(_ marker: LoopMarker) {
-        loopStart = marker.startSeconds
-        loopEnd = marker.endSeconds
-        setSpeed(marker.preferredSpeed)
-        seek(to: marker.startSeconds)
     }
 
     // MARK: - Segments

@@ -622,5 +622,5 @@ enum DeleteConfirmation: Identifiable {
 
 #Preview {
     LibraryView()
-        .modelContainer(for: [DanceClip.self, Tag.self, LoopMarker.self, ClipSegment.self], inMemory: true)
+        .modelContainer(for: [DanceClip.self, Tag.self, ClipSegment.self], inMemory: true)
 }
