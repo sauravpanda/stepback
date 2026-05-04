@@ -13,6 +13,7 @@
 		1EC09265A1CD5B1E67415B39 /* StepBackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023608F63978F9D1668F5AFC /* StepBackApp.swift */; };
 		1F02ADF6471B01E48A824A49 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6745FF48B10D28A5ED4BB568 /* Models.swift */; };
 		2B90619AE0B5262B774DEAC1 /* PracticeControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35987D9825155E131A40950 /* PracticeControls.swift */; };
+		3D990657ED52C04DBB04687A /* NowPlayingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46242480BEBB0CDD9B45F158 /* NowPlayingController.swift */; };
 		4181110140BD581DBFB0A380 /* StepTimingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB3B8C1BB7ACE2D1C13C7200 /* StepTimingTests.swift */; };
 		527B9B596B00D2C774173ECA /* PracticeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35AE6C8D6564306E1B0ADA20 /* PracticeView.swift */; };
 		5F405BD1B2F2EB7F30970683 /* LibraryFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4B3FD6B0A004C787FC243B /* LibraryFormatterTests.swift */; };
@@ -61,6 +62,7 @@
 		16E676751B59ED083837CE39 /* SpeedFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedFormatterTests.swift; sourceTree = "<group>"; };
 		2D07843122196F5F0DA539D1 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		35AE6C8D6564306E1B0ADA20 /* PracticeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeView.swift; sourceTree = "<group>"; };
+		46242480BEBB0CDD9B45F158 /* NowPlayingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingController.swift; sourceTree = "<group>"; };
 		462E264B215595E9EC3D1C4A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		46ED8A21F9D36A90E3306D55 /* StepBackTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = StepBackTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		543153BE7C96EE23F43CE81E /* PracticePlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticePlayerViewModel.swift; sourceTree = "<group>"; };
@@ -151,6 +153,7 @@
 				99CA1B5B91B8D4637FEEF872 /* AutoTagService.swift */,
 				C59BD8F65AE46261EEFD4F69 /* BeatDetector.swift */,
 				078CB839E392E788201DD665 /* BeatGrid.swift */,
+				46242480BEBB0CDD9B45F158 /* NowPlayingController.swift */,
 				D8F8476EAB523378C1F1E046 /* PhotosService.swift */,
 				543153BE7C96EE23F43CE81E /* PracticePlayerViewModel.swift */,
 				94AAA488969D7CF77497859D /* SegmentThumbnailGenerator.swift */,
@@ -297,6 +300,7 @@
 				72A012D3DCF8FA13D69C1868 /* KeepScreenAwake.swift in Sources */,
 				A88000A1ACD9503F7A9D6143 /* LibraryView.swift in Sources */,
 				1F02ADF6471B01E48A824A49 /* Models.swift in Sources */,
+				3D990657ED52C04DBB04687A /* NowPlayingController.swift in Sources */,
 				F7AD3FACE8B875F1C9DFA310 /* PhotosService.swift in Sources */,
 				03C973FD27336E9DD2EDE507 /* PracticeBeatUI.swift in Sources */,
 				2B90619AE0B5262B774DEAC1 /* PracticeControls.swift in Sources */,

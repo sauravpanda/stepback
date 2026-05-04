@@ -79,6 +79,8 @@ struct PracticeView: View {
             }
         }
         .task { await vm.load() }
+        .onAppear { vm.enableNowPlaying(for: clip) }
+        .onDisappear { vm.disableNowPlaying() }
         .keepScreenAwake()
         .sheet(isPresented: $comparePickerPresented) {
             CompareClipPicker(excludedID: clip.id) { picked in

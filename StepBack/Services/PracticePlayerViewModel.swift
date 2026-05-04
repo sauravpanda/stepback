@@ -34,6 +34,7 @@ final class PracticePlayerViewModel: ObservableObject {
     private let assetIdentifier: String
     private var localFileURL: URL?
     private let photosService: PhotosServicing
+    private var nowPlaying: NowPlayingController?
 
     init(
         assetIdentifier: String,
@@ -52,6 +53,19 @@ final class PracticePlayerViewModel: ObservableObject {
         if let timeObserver {
             player.removeTimeObserver(timeObserver)
         }
+    }
+
+    // MARK: - Now Playing
+
+    func enableNowPlaying(for clip: DanceClip) {
+        let controller = NowPlayingController(player: player, clip: clip)
+        controller.activate()
+        nowPlaying = controller
+    }
+
+    func disableNowPlaying() {
+        nowPlaying?.deactivate()
+        nowPlaying = nil
     }
 
     // MARK: - Loading
@@ -104,11 +118,13 @@ final class PracticePlayerViewModel: ObservableObject {
     func play() {
         player.playImmediately(atRate: Float(speed))
         isPlaying = true
+        nowPlaying?.updateInfo()
     }
 
     func pause() {
         player.pause()
         isPlaying = false
+        nowPlaying?.updateInfo()
     }
 
     func restart() {
@@ -124,6 +140,7 @@ final class PracticePlayerViewModel: ObservableObject {
         let time = CMTime(seconds: clamped, preferredTimescale: 600)
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
         currentTime = clamped
+        nowPlaying?.updateInfo()
     }
 
     func setSpeed(_ newSpeed: Double) {
