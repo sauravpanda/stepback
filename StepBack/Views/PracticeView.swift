@@ -316,6 +316,24 @@ extension PracticeView {
         )
         modelContext.insert(segment)
         try? modelContext.save()
+
+        // Render the thumbnail off-actor; persist back when ready.
+        if let asset = vm.player.currentItem?.asset {
+            let segmentID = segment.id
+            let startSeconds = start
+            Task {
+                let data = await SegmentThumbnailGenerator.generate(
+                    from: asset,
+                    atSeconds: startSeconds
+                )
+                await MainActor.run {
+                    if let stored = clip.segments.first(where: { $0.id == segmentID }) {
+                        stored.thumbnailData = data
+                        try? modelContext.save()
+                    }
+                }
+            }
+        }
     }
 
     fileprivate func deleteSegment(_ segment: ClipSegment) {
@@ -552,13 +570,7 @@ private struct SegmentCard: View {
     var body: some View {
         Button(action: onPlay) {
             HStack(spacing: 10) {
-                Image(systemName: isActive ? "waveform" : "play.fill")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(isActive ? .black : Theme.Color.accent)
-                    .frame(width: 28, height: 28)
-                    .background(
-                        Circle().fill(isActive ? Theme.Color.accent : Theme.Color.accentSoft)
-                    )
+                segmentGlyph
                 VStack(alignment: .leading, spacing: 2) {
                     Text(segment.title)
                         .font(.system(.footnote, design: .rounded, weight: .semibold))
@@ -595,6 +607,40 @@ private struct SegmentCard: View {
             } label: {
                 Label("Rename", systemImage: "pencil")
             }
+        }
+    }
+
+    @ViewBuilder
+    private var segmentGlyph: some View {
+        if let data = segment.thumbnailData, let uiImage = UIImage(data: data) {
+            ZStack {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 36, height: 36)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                if isActive {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Theme.Color.accent.opacity(0.4))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "waveform")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.black)
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isActive ? Theme.Color.accent : Color.clear, lineWidth: 1.5)
+            )
+        } else {
+            Image(systemName: isActive ? "waveform" : "play.fill")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(isActive ? .black : Theme.Color.accent)
+                .frame(width: 36, height: 36)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isActive ? Theme.Color.accent : Theme.Color.accentSoft)
+                )
         }
     }
 }
