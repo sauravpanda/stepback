@@ -394,6 +394,49 @@ private final class PlayerView: UIView {
         }
         return layer
     }
+
+    // Detach the AVPlayer from the layer when backgrounding so iOS keeps
+    // audio flowing even with the Background Audio capability enabled.
+    // While a video output is attached, the system aggressively pauses the
+    // player; nil-ing it lets the audio session keep going. Reattach on
+    // foreground so the user sees frames again.
+    private var stashedPlayer: AVPlayer?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(detachForBackground),
+                name: UIApplication.didEnterBackgroundNotification,
+                object: nil
+            )
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(reattachForForeground),
+                name: UIApplication.willEnterForegroundNotification,
+                object: nil
+            )
+        } else {
+            NotificationCenter.default.removeObserver(self)
+        }
+    }
+
+    @objc private func detachForBackground() {
+        stashedPlayer = playerLayer.player
+        playerLayer.player = nil
+    }
+
+    @objc private func reattachForForeground() {
+        if let stashedPlayer {
+            playerLayer.player = stashedPlayer
+        }
+        stashedPlayer = nil
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 }
 
 // MARK: - Scrubber
