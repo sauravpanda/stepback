@@ -68,6 +68,7 @@ struct CompareView: View {
             primary.pause()
             secondary.pause()
         }
+        .keepScreenAwake()
     }
 
     // MARK: - Panels

@@ -79,6 +79,7 @@ struct PracticeView: View {
             }
         }
         .task { await vm.load() }
+        .keepScreenAwake()
         .sheet(isPresented: $comparePickerPresented) {
             CompareClipPicker(excludedID: clip.id) { picked in
                 compareSecondary = picked

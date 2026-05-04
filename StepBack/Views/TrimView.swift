@@ -63,6 +63,7 @@ struct TrimView: View {
             attachTimeObserver()
         }
         .onDisappear { detachTimeObserver() }
+        .keepScreenAwake()
         .preferredColorScheme(.dark)
     }
 
