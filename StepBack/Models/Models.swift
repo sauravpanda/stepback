@@ -111,6 +111,7 @@ final class ClipSegment: Equatable, Hashable {
     var notes: String
     var dateAdded: Date
     var orderIndex: Int
+    var thumbnailData: Data?
     var clip: DanceClip?
 
     init(
