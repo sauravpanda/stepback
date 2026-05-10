@@ -22,7 +22,7 @@ struct PracticeView: View {
         _vm = StateObject(
             wrappedValue: PracticePlayerViewModel(
                 assetIdentifier: clip.assetIdentifier,
-                localFileURL: clip.trimmedFileURL
+                localFileURL: clip.preferredLocalFileURL
             )
         )
     }
@@ -105,7 +105,9 @@ struct PracticeView: View {
         }
         .fullScreenCover(isPresented: $trimSheetPresented, onDismiss: {
             // After a trim the underlying file has changed; rebind the player.
-            Task { await vm.reloadAsset(localFileURL: clip.trimmedFileURL) }
+            // Fall through to the sandboxed original if the user backed out
+            // of the trim sheet without exporting.
+            Task { await vm.reloadAsset(localFileURL: clip.preferredLocalFileURL) }
         }) {
             TrimView(clip: clip, player: vm.player, initialDuration: vm.duration)
         }
@@ -240,12 +242,6 @@ struct PracticeView: View {
                 Spacer()
             }
             SpeedPills(selected: vm.speed, onSelect: vm.setSpeed(_:))
-            SegmentList(
-                segments: clip.segments.sorted { ($0.orderIndex, $0.startSeconds) < ($1.orderIndex, $1.startSeconds) },
-                activeID: vm.activeSegmentID,
-                onPlay: vm.playSegment,
-                onEdit: { editingSegment = $0 }
-            )
             SegmentList(
                 segments: clip.segments.sorted { ($0.orderIndex, $0.startSeconds) < ($1.orderIndex, $1.startSeconds) },
                 activeID: vm.activeSegmentID,

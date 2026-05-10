@@ -23,6 +23,7 @@ struct LibraryView: View {
 
     private let columns = [GridItem(.adaptive(minimum: 140), spacing: 12)]
     private let photosService: PhotosServicing = PhotosService()
+    private let originalImporter = OriginalImportService()
 
     var body: some View {
         NavigationStack {
@@ -340,6 +341,11 @@ struct LibraryView: View {
         let title = defaultTitle(for: urlAsset, identifier: identifier)
         let creationDate = creationDate(for: identifier) ?? Date()
 
+        // Own the bytes so segments / beat data survive the user deleting the
+        // original from Photos. `try?` because failure is non-fatal: we still
+        // import with PHAsset-only fallback rather than blocking the user.
+        let originalFileName = try? await originalImporter.importCopy(of: urlAsset)
+
         let clip = DanceClip(
             title: title,
             assetIdentifier: identifier,
@@ -347,6 +353,7 @@ struct LibraryView: View {
             thumbnailData: thumbnail,
             durationSeconds: duration.isFinite ? duration : 0
         )
+        clip.originalFileName = originalFileName
         modelContext.insert(clip)
         try modelContext.save()
     }
@@ -376,15 +383,28 @@ struct LibraryView: View {
     private func commitDelete(_ target: DeleteConfirmation) {
         switch target {
         case .single(let clip):
+            cleanupSandboxFiles(for: clip)
             modelContext.delete(clip)
         case .bulk(let clips):
             for clip in clips {
+                cleanupSandboxFiles(for: clip)
                 modelContext.delete(clip)
             }
             exitSelectionMode()
         }
         try? modelContext.save()
         deleteConfirmation = nil
+    }
+
+    /// Removes the sandboxed original + trim files for a clip. Safe to call
+    /// for legacy clips that have neither — both branches no-op when nil.
+    private func cleanupSandboxFiles(for clip: DanceClip) {
+        if let name = clip.originalFileName {
+            OriginalStorage.deleteIfExists(name: name)
+        }
+        if let name = clip.trimmedFileName {
+            TrimStorage.deleteIfExists(name: name)
+        }
     }
 }
 
