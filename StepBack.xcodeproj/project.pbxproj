@@ -23,6 +23,8 @@
 		72A012D3DCF8FA13D69C1868 /* KeepScreenAwake.swift in Sources */ = {isa = PBXBuildFile; fileRef = E56B6CE778D3BD0C5B1B248B /* KeepScreenAwake.swift */; };
 		76D520F6EC5A0A8E57C8AAA1 /* BeatDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BC077A9FA8B51D07C178A0 /* BeatDetectorTests.swift */; };
 		7FA3BBA0113FDF3282819E84 /* PracticePlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 543153BE7C96EE23F43CE81E /* PracticePlayerViewModel.swift */; };
+		8772C73FA1983B9E8A39FAD8 /* Schema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5445312DC1A378A65F963DD7 /* Schema.swift */; };
+		9799CACB6C924AC1940D9FE3 /* StepBackMigrationPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808127290713ACE9855DA35E /* StepBackMigrationPlanTests.swift */; };
 		9DCAAD9B2DCFAEE83A9D4879 /* TrimView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF9D9B68E730BA51C86D70A /* TrimView.swift */; };
 		9F90D5641396A9BF3E7A09FE /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E94F050959741028A8574D /* RootView.swift */; };
 		A49A15759EECD46EC5E3A694 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D07843122196F5F0DA539D1 /* Theme.swift */; };
@@ -69,12 +71,14 @@
 		46ED8A21F9D36A90E3306D55 /* StepBackTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = StepBackTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4D1395E84111ADD80CC22565 /* OriginalImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OriginalImportService.swift; sourceTree = "<group>"; };
 		543153BE7C96EE23F43CE81E /* PracticePlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticePlayerViewModel.swift; sourceTree = "<group>"; };
+		5445312DC1A378A65F963DD7 /* Schema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Schema.swift; sourceTree = "<group>"; };
 		56E94F050959741028A8574D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		57317F752B65258CB2D04530 /* LoopEvaluatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopEvaluatorTests.swift; sourceTree = "<group>"; };
 		6745FF48B10D28A5ED4BB568 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		6BCED6C8E1CE7A48B341C8B1 /* TrimExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrimExportService.swift; sourceTree = "<group>"; };
 		7093A077C0A2C139BD7BDD29 /* BeatGridTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatGridTests.swift; sourceTree = "<group>"; };
 		71643D36F7F8D028B560F012 /* TrimAnnotationShifter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrimAnnotationShifter.swift; sourceTree = "<group>"; };
+		808127290713ACE9855DA35E /* StepBackMigrationPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepBackMigrationPlanTests.swift; sourceTree = "<group>"; };
 		848D52E156E709AA0226CEE8 /* ModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsTests.swift; sourceTree = "<group>"; };
 		8B4B3FD6B0A004C787FC243B /* LibraryFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFormatterTests.swift; sourceTree = "<group>"; };
 		8D25E6771271EDD5B867F61E /* ClipEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditView.swift; sourceTree = "<group>"; };
@@ -113,6 +117,7 @@
 			isa = PBXGroup;
 			children = (
 				6745FF48B10D28A5ED4BB568 /* Models.swift */,
+				5445312DC1A378A65F963DD7 /* Schema.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -145,6 +150,7 @@
 				EF4094CC2957462A284F735A /* OriginalImportServiceTests.swift */,
 				B5505E62D217CB6AA3579A6D /* PhotosServiceTests.swift */,
 				16E676751B59ED083837CE39 /* SpeedFormatterTests.swift */,
+				808127290713ACE9855DA35E /* StepBackMigrationPlanTests.swift */,
 				DB3B8C1BB7ACE2D1C13C7200 /* StepTimingTests.swift */,
 				B7C112AEA59633E85CF8267D /* ThemeTests.swift */,
 				EB991AFC28C64366954E1D19 /* TrimAnnotationShifterTests.swift */,
@@ -314,6 +320,7 @@
 				7FA3BBA0113FDF3282819E84 /* PracticePlayerViewModel.swift in Sources */,
 				527B9B596B00D2C774173ECA /* PracticeView.swift in Sources */,
 				9F90D5641396A9BF3E7A09FE /* RootView.swift in Sources */,
+				8772C73FA1983B9E8A39FAD8 /* Schema.swift in Sources */,
 				AD47C4CE36AF1FD4FF011BCC /* SegmentThumbnailGenerator.swift in Sources */,
 				1EC09265A1CD5B1E67415B39 /* StepBackApp.swift in Sources */,
 				622A6663058E88A57B465B62 /* StepTiming.swift in Sources */,
@@ -338,6 +345,7 @@
 				648013A1A4C23692CD6ED03B /* OriginalImportServiceTests.swift in Sources */,
 				CC6F98E7716925F88449689A /* PhotosServiceTests.swift in Sources */,
 				F35848C14CA3DF06A4EBE554 /* SpeedFormatterTests.swift in Sources */,
+				9799CACB6C924AC1940D9FE3 /* StepBackMigrationPlanTests.swift in Sources */,
 				4181110140BD581DBFB0A380 /* StepTimingTests.swift in Sources */,
 				C97E59DA25A51E16ECA03607 /* ThemeTests.swift in Sources */,
 				AB9467B4E5F44BFF1AA916B1 /* TrimAnnotationShifterTests.swift in Sources */,
