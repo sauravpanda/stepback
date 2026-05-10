@@ -21,7 +21,7 @@ struct LibraryView: View {
     @State private var bulkMovePresented: Bool = false
     @State private var deleteConfirmation: DeleteConfirmation?
 
-    private let columns = [GridItem(.adaptive(minimum: 140), spacing: 12)]
+    private let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
     private let photosService: PhotosServicing = PhotosService()
     private let originalImporter = OriginalImportService()
 
@@ -431,9 +431,11 @@ private struct LibraryCell: View {
                     Theme.Color.accent.opacity(0.25)
                 }
                 VStack {
-                    HStack {
+                    HStack(alignment: .top) {
                         if selectionState != .hidden {
                             selectionIndicator
+                        } else if clip.segments.count > 0 {
+                            patternsBadge
                         }
                         Spacer()
                         if selectionState == .hidden, onEdit != nil || onDelete != nil {
@@ -463,11 +465,16 @@ private struct LibraryCell: View {
                 .font(Theme.Font.bodyEmphasized)
                 .foregroundStyle(Theme.Color.textPrimary)
                 .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(clip.dateAdded, style: .date)
+            Text(LibraryFormatter.shortDate(clip.dateAdded))
                 .font(Theme.Font.caption)
                 .foregroundStyle(Theme.Color.textTertiary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -492,6 +499,23 @@ private struct LibraryCell: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(Color.black.opacity(0.55), in: Capsule())
+    }
+
+    /// Top-left chip showing how many saved patterns this clip has. Hidden
+    /// when the clip has none — a clip without patterns is the empty case,
+    /// not a state worth surfacing.
+    private var patternsBadge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "scissors")
+                .font(.system(size: 10, weight: .semibold))
+            Text("\(clip.segments.count)")
+                .font(Theme.Font.timestamp)
+        }
+        .foregroundStyle(Theme.Color.textPrimary)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Color.black.opacity(0.55), in: Capsule())
+        .accessibilityLabel("\(clip.segments.count) pattern\(clip.segments.count == 1 ? "" : "s")")
     }
 
     private var selectionIndicator: some View {
@@ -595,6 +619,23 @@ enum LibraryFormatter {
         guard seconds.isFinite, seconds > 0 else { return "--:--" }
         let whole = Int(seconds.rounded())
         return String(format: "%d:%02d", whole / 60, whole % 60)
+    }
+
+    /// Compact date for library cells — "Mar 11" within the current year,
+    /// "Mar 11, 2025" for prior years. The cell subtitle is constrained to a
+    /// single line, so the verbose default `.date` style overflows.
+    static func shortDate(
+        _ date: Date,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = calendar.locale ?? .autoupdatingCurrent
+        formatter.timeZone = calendar.timeZone
+        let sameYear = calendar.component(.year, from: date)
+            == calendar.component(.year, from: now)
+        formatter.setLocalizedDateFormatFromTemplate(sameYear ? "MMM d" : "MMM d y")
+        return formatter.string(from: date)
     }
 }
 
