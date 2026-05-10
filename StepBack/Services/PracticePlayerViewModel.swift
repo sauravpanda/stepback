@@ -29,7 +29,18 @@ final class PracticePlayerViewModel: ObservableObject {
     // outside the normal actor-isolated execution path — so it is marked
     // nonisolated(unsafe) rather than dragged through MainActor.
     private nonisolated(unsafe) var timeObserver: Any?
+    private nonisolated(unsafe) var beatBoundaryObserver: Any?
+    private var configuredBeatTimes: [Double] = []
+    private var configuredDownbeatIndices: Set<Int> = []
     private var playerItem: AVPlayerItem?
+
+    /// Increments every time the player crosses a beat boundary. UI binds to
+    /// this rather than `currentTime` so the pulse animation only re-renders
+    /// on beat transitions, not on every periodic time observer tick.
+    @Published private(set) var beatPulseID: Int = 0
+    /// Whether the most recent beat boundary was a downbeat (count 1). UI
+    /// uses this to scale the pulse bigger on the first beat of a measure.
+    @Published private(set) var lastBeatWasDownbeat: Bool = false
 
     private let assetIdentifier: String
     private var localFileURL: URL?
@@ -52,6 +63,47 @@ final class PracticePlayerViewModel: ObservableObject {
     deinit {
         if let timeObserver {
             player.removeTimeObserver(timeObserver)
+        }
+        if let beatBoundaryObserver {
+            player.removeTimeObserver(beatBoundaryObserver)
+        }
+    }
+
+    // MARK: - Beat pulse
+
+    /// Registers boundary-time observers at every entry in `beatTimes`.
+    /// AVPlayer fires the callback when playback crosses each timestamp,
+    /// which is more accurate (and cheaper) than checking against
+    /// `currentTime` from the periodic observer. Idempotent — calling again
+    /// tears down the previous observer first, so it's safe to invoke when
+    /// beats are re-detected.
+    func configureBeatPulse(beatTimes: [Double], downbeatIndices: Set<Int>) {
+        if let beatBoundaryObserver {
+            player.removeTimeObserver(beatBoundaryObserver)
+            self.beatBoundaryObserver = nil
+        }
+        configuredBeatTimes = beatTimes
+        configuredDownbeatIndices = downbeatIndices
+        guard !beatTimes.isEmpty else { return }
+
+        let nsValues = beatTimes.map {
+            NSValue(time: CMTime(seconds: $0, preferredTimescale: 600))
+        }
+        beatBoundaryObserver = player.addBoundaryTimeObserver(
+            forTimes: nsValues,
+            queue: .main
+        ) { [weak self] in
+            // queue: .main → safe to assume MainActor.
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let now = self.player.currentTime().seconds
+                // The boundary that fired is the latest beat time at or
+                // before `now` (with a small slack for timer jitter).
+                let index = self.configuredBeatTimes.lastIndex { $0 <= now + 0.05 }
+                    ?? 0
+                self.lastBeatWasDownbeat = self.configuredDownbeatIndices.contains(index)
+                self.beatPulseID &+= 1
+            }
         }
     }
 

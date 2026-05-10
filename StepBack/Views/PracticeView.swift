@@ -78,7 +78,21 @@ struct PracticeView: View {
                 }
             }
         }
-        .task { await vm.load() }
+        .task {
+            await vm.load()
+            configureBeatPulse()
+        }
+        .onChange(of: clip.beatTimesData) { _, _ in
+            // Re-arm the boundary observer when beats are (re-)detected so
+            // the pulse comes online without requiring a view re-entry.
+            configureBeatPulse()
+        }
+        .onChange(of: clip.firstDownbeatSeconds) { _, _ in
+            // Anchor changes don't change *which* times pulse, but they do
+            // change which are downbeats — re-arm so the bigger-on-1 logic
+            // tracks the new measure boundaries.
+            configureBeatPulse()
+        }
         .onAppear { vm.enableNowPlaying(for: clip) }
         .onDisappear { vm.disableNowPlaying() }
         .keepScreenAwake()
@@ -184,7 +198,9 @@ struct PracticeView: View {
                     measurePosition: measurePosition,
                     beatsPerMeasure: clip.beatsPerMeasure,
                     onDetect: { Task { await detectBeats() } },
-                    onRescale: clip.hasBeatAnalysis ? rescaleBeats : nil
+                    onRescale: clip.hasBeatAnalysis ? rescaleBeats : nil,
+                    beatPulseID: vm.beatPulseID,
+                    lastBeatWasDownbeat: vm.lastBeatWasDownbeat
                 )
                 Spacer()
             }
@@ -343,6 +359,19 @@ extension PracticeView {
         await vm.detectBeats(for: clip) {
             try? modelContext.save()
         }
+        configureBeatPulse()
+    }
+
+    fileprivate func configureBeatPulse() {
+        let downbeats = BeatGrid.downbeatIndices(
+            beatTimes: clip.beatTimes,
+            anchor: clip.firstDownbeatSeconds,
+            beatsPerMeasure: clip.beatsPerMeasure
+        )
+        vm.configureBeatPulse(
+            beatTimes: clip.beatTimes,
+            downbeatIndices: downbeats
+        )
     }
 
     fileprivate func tapOnBeatOne() {

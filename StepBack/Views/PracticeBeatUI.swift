@@ -10,6 +10,14 @@ struct BPMBadge: View {
     let onDetect: () -> Void
     var onRescale: ((Double) -> Void)?
 
+    /// Increments on every beat boundary. The badge ignores the actual
+    /// value and just keys an animation off changes, so wraparound is safe.
+    var beatPulseID: Int = 0
+    /// Bigger pulse on count 1.
+    var lastBeatWasDownbeat: Bool = false
+
+    @State private var pulseScale: CGFloat = 1.0
+
     var body: some View {
         HStack(spacing: 8) {
             if let bpm {
@@ -41,6 +49,23 @@ struct BPMBadge: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Theme.Color.accentSoft, in: Capsule())
+        .scaleEffect(pulseScale)
+        .onChange(of: beatPulseID) { _, _ in
+            triggerPulse(big: lastBeatWasDownbeat)
+        }
+    }
+
+    /// Two-stage scale: snap up fast, ease back. A single `withAnimation`
+    /// would spend half the cycle scaling up, which feels mushy at higher
+    /// BPMs. `delay` chains the return so the snap reads as a *tick*.
+    private func triggerPulse(big: Bool) {
+        let target: CGFloat = big ? 1.18 : 1.08
+        withAnimation(.easeOut(duration: 0.05)) {
+            pulseScale = target
+        }
+        withAnimation(.easeIn(duration: 0.18).delay(0.05)) {
+            pulseScale = 1.0
+        }
     }
 }
 
