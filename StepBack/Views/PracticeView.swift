@@ -149,12 +149,20 @@ struct PracticeView: View {
                 .tint(Theme.Color.accent)
         } else {
             VStack(spacing: 0) {
+                // Don't constrain to 16:9 here — AVPlayerLayer's .resizeAspect
+                // already letterboxes the actual video. A rigid ratio on this
+                // container double-letterboxes (big black bands top/bottom on
+                // tall phone screens for any non-16:9 source). Let the video
+                // claim leftover vertical space; controls keep their intrinsic
+                // height and float beneath.
                 ZoomablePlayerContainer {
                     PlayerSurface(player: vm.player)
                         .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
                 }
-                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black)
+                .layoutPriority(1)
+
                 controls
             }
         }
@@ -190,7 +198,7 @@ struct PracticeView: View {
             anchor: clip.firstDownbeatSeconds,
             beatsPerMeasure: clip.beatsPerMeasure
         )
-        return VStack(spacing: 14) {
+        return VStack(spacing: 10) {
             HStack {
                 BPMBadge(
                     bpm: clip.bpm,
@@ -265,7 +273,8 @@ struct PracticeView: View {
                 onEdit: { editingSegment = $0 }
             )
         }
-        .padding(16)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     private var loopControls: some View {
