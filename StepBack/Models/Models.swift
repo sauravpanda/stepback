@@ -24,6 +24,12 @@ final class DanceClip: Equatable, Hashable {
     /// original from Photos.
     var trimmedFileName: String?
 
+    /// Filename (in `OriginalStorage.directory`) for a sandboxed copy of the
+    /// imported video. Set on import so segments and beat data survive the
+    /// user deleting the original from Photos. Nil for clips imported before
+    /// this field existed; those keep the legacy PHAsset-only behavior.
+    var originalFileName: String?
+
     @Relationship(deleteRule: .cascade, inverse: \ClipSegment.clip)
     var segments: [ClipSegment] = []
 
@@ -82,6 +88,19 @@ final class DanceClip: Equatable, Hashable {
     var trimmedFileURL: URL? {
         guard let trimmedFileName else { return nil }
         return TrimStorage.fileURL(name: trimmedFileName)
+    }
+
+    /// Resolved sandbox URL for the imported original copy, when one exists.
+    var originalFileURL: URL? {
+        guard let originalFileName else { return nil }
+        return OriginalStorage.fileURL(name: originalFileName)
+    }
+
+    /// Best local file to play back: trim if present, otherwise the
+    /// sandboxed original. Falls through to nil for legacy PHAsset-only
+    /// clips, which the caller resolves via `PhotosService`.
+    var preferredLocalFileURL: URL? {
+        trimmedFileURL ?? originalFileURL
     }
 }
 

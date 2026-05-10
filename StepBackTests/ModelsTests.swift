@@ -36,6 +36,9 @@ final class ModelsTests: XCTestCase {
         XCTAssertTrue(clip.segments.isEmpty)
         XCTAssertTrue(clip.tags.isEmpty)
         XCTAssertNil(clip.trimmedFileName)
+        XCTAssertNil(clip.originalFileName)
+        XCTAssertNil(clip.originalFileURL)
+        XCTAssertNil(clip.preferredLocalFileURL)
 
         // Beat analysis defaults
         XCTAssertNil(clip.bpm)
@@ -105,6 +108,30 @@ final class ModelsTests: XCTestCase {
     func testClipSegmentDurationNeverNegative() {
         let segment = ClipSegment(title: "Weird", startSeconds: 10, endSeconds: 5)
         XCTAssertEqual(segment.durationSeconds, 0)
+    }
+
+    // MARK: - Local file URL preference
+
+    func testPreferredLocalFileURLPrefersTrimOverOriginal() {
+        let clip = DanceClip(title: "Both", assetIdentifier: "ASSET-PRIO")
+        clip.originalFileName = "orig.mov"
+        clip.trimmedFileName = "trim.mov"
+
+        XCTAssertEqual(clip.preferredLocalFileURL, clip.trimmedFileURL)
+        XCTAssertNotEqual(clip.preferredLocalFileURL, clip.originalFileURL)
+    }
+
+    func testPreferredLocalFileURLFallsThroughToOriginal() {
+        let clip = DanceClip(title: "Original only", assetIdentifier: "ASSET-ORIG")
+        clip.originalFileName = "orig.mov"
+
+        XCTAssertEqual(clip.preferredLocalFileURL, clip.originalFileURL)
+    }
+
+    func testOriginalFileURLNilWhenNoFileName() {
+        let clip = DanceClip(title: "Legacy", assetIdentifier: "ASSET-LEGACY")
+        XCTAssertNil(clip.originalFileURL)
+        XCTAssertNil(clip.preferredLocalFileURL)
     }
 
     // MARK: - Tag
