@@ -37,8 +37,12 @@ struct PracticeView: View {
         .toolbarBackground(Theme.Color.background, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
+            // Trim moved into the inline action row below the scrubber for
+            // discoverability — the chrome icon was hard to associate with
+            // "trim clip" at a glance. Compare and Mirror stay here because
+            // they're rarer and ergonomic next to the title.
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 8) {
+                HStack(spacing: 12) {
                     Button {
                         editSheetPresented = true
                     } label: {
@@ -47,31 +51,23 @@ struct PracticeView: View {
                     }
                     .accessibilityLabel("Edit clip")
                     Button {
-                        // Park the parent VM in a neutral state — loop bounds and
-                        // segment selection would fight TrimView's own seeking
-                        // since they share an AVPlayer.
-                        vm.pause()
-                        vm.clearLoop()
-                        trimSheetPresented = true
-                    } label: {
-                        Image(systemName: "crop")
-                            .foregroundStyle(Theme.Color.textPrimary)
-                    }
-                    .accessibilityLabel("Trim clip")
-                    Button {
                         comparePickerPresented = true
                     } label: {
-                        Image(systemName: "rectangle.2.swap")
+                        Label("Compare", systemImage: "rectangle.2.swap")
+                            .labelStyle(.titleAndIcon)
+                            .font(.system(.footnote, design: .rounded, weight: .semibold))
                             .foregroundStyle(Theme.Color.textPrimary)
                     }
                     .accessibilityLabel("Compare with another clip")
                     Button {
                         vm.toggleMirror()
                     } label: {
-                        Image(systemName: vm.mirrored
+                        Label("Mirror", systemImage: vm.mirrored
                             ? "rectangle.portrait.on.rectangle.portrait.angled.fill"
                             : "rectangle.portrait.on.rectangle.portrait.angled"
                         )
+                        .labelStyle(.titleAndIcon)
+                        .font(.system(.footnote, design: .rounded, weight: .semibold))
                         .foregroundStyle(vm.mirrored ? Theme.Color.accent : Theme.Color.textPrimary)
                     }
                     .accessibilityLabel(vm.mirrored ? "Unmirror video" : "Mirror video")
@@ -165,6 +161,12 @@ struct PracticeView: View {
 
                 controls
             }
+            // Without an explicit fill, the parent ZStack's default centering
+            // can leave dead space at the bottom even when children are
+            // flexible — `layoutPriority` only redistributes within the size
+            // proposed to the VStack. Pin to the full ZStack so the player
+            // stretches to the top of the controls.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -244,9 +246,9 @@ struct PracticeView: View {
                     .font(Theme.Font.timestamp)
                     .foregroundStyle(Theme.Color.textSecondary)
             }
+            actionRow
             loopControls
-            HStack(spacing: 32) {
-                Spacer()
+            HStack(spacing: 24) {
                 FrameStepButton(systemName: "backward.frame.fill") {
                     vm.stepBackward()
                 }
@@ -263,8 +265,8 @@ struct PracticeView: View {
                 FrameStepButton(systemName: "forward.frame.fill") {
                     vm.stepForward()
                 }
-                Spacer()
             }
+            .frame(maxWidth: .infinity)
             SpeedPills(selected: vm.speed, onSelect: vm.setSpeed(_:))
             SegmentList(
                 segments: clip.segments.sorted { ($0.orderIndex, $0.startSeconds) < ($1.orderIndex, $1.startSeconds) },
@@ -294,20 +296,6 @@ struct PracticeView: View {
                 vm.markLoopEnd()
             }
             Spacer()
-            if vm.hasLoopRegion {
-                Button {
-                    splitSheetPresented = true
-                } label: {
-                    Label("Split", systemImage: "scissors")
-                        .font(.system(.footnote, design: .rounded, weight: .semibold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Theme.Color.accent, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Save A–B as new pattern")
-            }
             if vm.loopStart != nil || vm.loopEnd != nil {
                 Button {
                     vm.clearLoop()
@@ -319,6 +307,78 @@ struct PracticeView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Clear loop")
             }
+        }
+    }
+
+    /// Discoverable, always-visible row for trim + pattern. The Split button
+    /// used to live inside `loopControls` and only appeared when both A and
+    /// B were set — fine for users who already knew the workflow, invisible
+    /// for everyone else. The trim icon was buried in the top toolbar with
+    /// no label. Promoting both to labeled pills here makes the two main
+    /// "edit this clip" actions obvious from the practice surface.
+    private var actionRow: some View {
+        HStack(spacing: 8) {
+            ActionPill(
+                title: "Trim",
+                systemImage: "crop",
+                tint: .surface
+            ) {
+                // Park the parent VM in a neutral state — loop bounds and
+                // segment selection would fight TrimView's own seeking
+                // since they share an AVPlayer.
+                vm.pause()
+                vm.clearLoop()
+                trimSheetPresented = true
+            }
+            ActionPill(
+                title: vm.hasLoopRegion ? "Save pattern" : "Set A & B to save",
+                systemImage: "scissors",
+                tint: vm.hasLoopRegion ? .accent : .surfaceMuted
+            ) {
+                splitSheetPresented = true
+            }
+            .disabled(!vm.hasLoopRegion)
+            Spacer()
+        }
+    }
+}
+
+/// Labeled pill button for the practice action row. Two visual variants:
+/// `.accent` (filled accent) for the primary action when ready, `.surface`
+/// for a neutral secondary action, `.surfaceMuted` for a disabled state.
+private struct ActionPill: View {
+    enum Tint { case accent, surface, surfaceMuted }
+
+    let title: String
+    let systemImage: String
+    let tint: Tint
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.system(.footnote, design: .rounded, weight: .semibold))
+                .foregroundStyle(foreground)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(background, in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var foreground: Color {
+        switch tint {
+        case .accent: .black
+        case .surface: Theme.Color.textPrimary
+        case .surfaceMuted: Theme.Color.textTertiary
+        }
+    }
+
+    private var background: Color {
+        switch tint {
+        case .accent: Theme.Color.accent
+        case .surface: Theme.Color.surfaceElevated
+        case .surfaceMuted: Theme.Color.surface
         }
     }
 }
