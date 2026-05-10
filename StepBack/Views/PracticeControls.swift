@@ -31,6 +31,50 @@ struct SpeedPills: View {
     }
 }
 
+// MARK: - Speed menu (compact form for the practice transport row)
+
+/// Compact speed control for places where a full pill row is too wide.
+/// Shows the current speed as a tinted capsule with a chevron; tapping
+/// opens a Menu with the same set of speeds as `SpeedPills`. Used in the
+/// merged transport row on PracticeView so play / A-B / speed all live on
+/// one line. Keeps `SpeedPills` for the segment sheets, where vertical
+/// space isn't tight and the always-visible options are easier to scan.
+struct SpeedMenuButton: View {
+    let selected: Double
+    let onSelect: (Double) -> Void
+
+    var body: some View {
+        let tint = Theme.Color.speedPillColor(for: selected)
+        Menu {
+            Picker("Practice speed", selection: bindingSpeed) {
+                ForEach(SpeedPills.speeds, id: \.self) { speed in
+                    Text(SpeedFormatter.pill(speed)).tag(speed)
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(SpeedFormatter.pill(selected))
+                    .font(.system(.footnote, design: .rounded, weight: .bold))
+                    .foregroundStyle(.black)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.black.opacity(0.7))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(tint))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Practice speed: \(SpeedFormatter.pill(selected))")
+    }
+
+    /// Bridges the let-based API (selected + onSelect) into the Binding the
+    /// Picker needs without forcing the parent to hand us one.
+    private var bindingSpeed: Binding<Double> {
+        Binding(get: { selected }, set: onSelect)
+    }
+}
+
 // MARK: - Formatting
 
 enum SpeedFormatter {
