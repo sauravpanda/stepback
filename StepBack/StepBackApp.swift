@@ -4,6 +4,9 @@ import SwiftUI
 
 @main
 struct StepBackApp: App {
+
+    private let container: ModelContainer
+
     init() {
         // Route playback through .playback so video audio ignores the silent
         // switch — otherwise the phone's ringer toggle mutes practice clips.
@@ -13,12 +16,26 @@ struct StepBackApp: App {
             try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try? AVAudioSession.sharedInstance().setActive(true)
         }
+
+        do {
+            let schema = Schema(versionedSchema: SchemaV1.self)
+            container = try ModelContainer(
+                for: schema,
+                migrationPlan: StepBackMigrationPlan.self,
+                configurations: ModelConfiguration(schema: schema)
+            )
+        } catch {
+            // For a personal-use app, surfacing this as a hard crash beats
+            // silently corrupting the store. If the migration plan ever
+            // fails on a real device, recovery is "delete app, reinstall."
+            fatalError("Failed to create StepBack ModelContainer: \(error)")
+        }
     }
 
     var body: some Scene {
         WindowGroup {
             RootView()
         }
-        .modelContainer(for: [DanceClip.self, Tag.self, ClipSegment.self])
+        .modelContainer(container)
     }
 }
