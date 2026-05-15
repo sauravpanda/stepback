@@ -10,8 +10,13 @@ import SwiftUI
 struct ZoomablePlayerContainer<Content: View>: View {
 
     private let content: Content
+    private let onSingleTap: (() -> Void)?
 
-    init(@ViewBuilder content: () -> Content) {
+    init(
+        onSingleTap: (() -> Void)? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.onSingleTap = onSingleTap
         self.content = content()
     }
 
@@ -57,6 +62,12 @@ struct ZoomablePlayerContainer<Content: View>: View {
                             baseScale = scale
                             baseOffset = offset
                         }
+                    }
+                    // Order matters: registering the count: 1 gesture after
+                    // count: 2 lets SwiftUI disambiguate — a quick second tap
+                    // still triggers zoom, not two single-tap pauses.
+                    .onTapGesture(count: 1) {
+                        onSingleTap?()
                     }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)

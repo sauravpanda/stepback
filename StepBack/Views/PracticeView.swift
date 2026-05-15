@@ -16,6 +16,10 @@ struct PracticeView: View {
     @State private var comparePickerPresented = false
     @State private var compareSecondary: DanceClip?
     @State private var editSheetPresented = false
+    /// Hides the entire control stack so the video can claim the screen.
+    /// Single-tap on the video remains wired to play/pause so pausing
+    /// doesn't require bringing controls back first.
+    @State private var controlsHidden: Bool = false
 
     init(clip: DanceClip) {
         self.clip = clip
@@ -43,6 +47,16 @@ struct PracticeView: View {
             // they're rarer and ergonomic next to the title.
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 12) {
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            controlsHidden.toggle()
+                        }
+                    } label: {
+                        Image(systemName: controlsHidden ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(controlsHidden ? Theme.Color.accent : Theme.Color.textPrimary)
+                    }
+                    .accessibilityLabel(controlsHidden ? "Show controls" : "Hide controls")
                     Button {
                         editSheetPresented = true
                     } label: {
@@ -151,7 +165,7 @@ struct PracticeView: View {
                 // tall phone screens for any non-16:9 source). Let the video
                 // claim leftover vertical space; controls keep their intrinsic
                 // height and float beneath.
-                ZoomablePlayerContainer {
+                ZoomablePlayerContainer(onSingleTap: { vm.togglePlayPause() }) {
                     PlayerSurface(player: vm.player)
                         .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
                 }
@@ -159,7 +173,17 @@ struct PracticeView: View {
                 .background(Color.black)
                 .layoutPriority(1)
 
-                controls
+                if !controlsHidden {
+                    controls
+                        // Slide down + fade so the controls feel anchored to
+                        // the bottom edge; an opacity-only swap pops, and a
+                        // height collapse without a translation reads as a
+                        // glitch.
+                        .transition(
+                            .move(edge: .bottom)
+                            .combined(with: .opacity)
+                        )
+                }
             }
             // Without an explicit fill, the parent ZStack's default centering
             // can leave dead space at the bottom even when children are
