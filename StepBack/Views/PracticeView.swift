@@ -207,7 +207,8 @@ struct PracticeView: View {
                             // the original frame's body.
                             PoseOverlay(
                                 pose: poseCoordinator.pose,
-                                imageSize: poseCoordinator.imageSize
+                                imageSize: poseCoordinator.imageSize,
+                                poseAge: poseCoordinator.poseAge
                             )
                             .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
                         }

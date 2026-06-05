@@ -34,12 +34,14 @@ enum PoseDetectionError: Error, LocalizedError {
 /// 10–30ms per frame on recent iPhones, more on older hardware.
 struct PoseDetectionService: Sendable {
 
-    /// Joints below this confidence are dropped. 0.3 is Apple's documented
-    /// "reasonably reliable" floor for 2D body pose; lower than that and
-    /// the overlay starts dancing around on hands/feet.
+    /// Joints below this confidence are dropped. Apple's documented
+    /// "reasonably reliable" floor is 0.3; we use 0.25 so dance footage
+    /// — where wrists and ankles routinely sit just under 0.3 during
+    /// transitions — keeps producing usable skeletons instead of flickering.
+    /// Below 0.2 hands start drifting visibly; that's the real floor.
     let confidenceThreshold: Float
 
-    init(confidenceThreshold: Float = 0.3) {
+    init(confidenceThreshold: Float = 0.25) {
         self.confidenceThreshold = confidenceThreshold
     }
 
