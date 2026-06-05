@@ -26,11 +26,20 @@ final class PoseStreamCoordinator: ObservableObject {
     @Published private(set) var status: Status = .idle
     @Published private(set) var imageSize: CGSize?
     @Published private(set) var isActive: Bool = false
+    /// Seconds since the most recent *successful* detection. Used by the
+    /// overlay to fade the skeleton from solid (fresh) to transparent
+    /// (about-to-be-cleared) so the dashboard can see when we're holding a
+    /// stale frame vs reading the current one.
+    @Published private(set) var poseAge: TimeInterval = .infinity
 
     /// 100ms tick. At 10Hz, Vision's body-pose request runs cheaply enough
     /// to stay out of the main thread budget (work happens on
     /// `detectionQueue`) while still feeling reactive on the overlay.
     private static let tickInterval: Duration = .milliseconds(100)
+    /// Last successful pose stays visible for this long after detection
+    /// starts failing. Bridges the flicker when Vision drops a frame or
+    /// two on hard footage (motion blur, partial occlusion, etc).
+    private static let staleAfter: TimeInterval = 0.5
 
     private let player: AVPlayer
     private let detector: PoseDetectionService
@@ -40,6 +49,8 @@ final class PoseStreamCoordinator: ObservableObject {
         qos: .userInitiated
     )
     private var tickTask: Task<Void, Never>?
+    private var lastSuccessTime: Date?
+    private var lastProcessedTime: CMTime?
 
     init(
         player: AVPlayer,
@@ -61,6 +72,9 @@ final class PoseStreamCoordinator: ObservableObject {
         isActive = true
         status = .waiting
         pose = nil
+        lastSuccessTime = nil
+        lastProcessedTime = nil
+        poseAge = .infinity
         attachOutputIfNeeded()
         tickTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -76,6 +90,9 @@ final class PoseStreamCoordinator: ObservableObject {
         isActive = false
         status = .idle
         pose = nil
+        lastSuccessTime = nil
+        lastProcessedTime = nil
+        poseAge = .infinity
         detachOutput()
     }
 
@@ -102,11 +119,30 @@ final class PoseStreamCoordinator: ObservableObject {
         attachOutputIfNeeded()
         guard player.currentItem != nil else { return }
         let time = player.currentTime()
-        guard videoOutput.hasNewPixelBuffer(forItemTime: time) else { return }
+
+        // Re-run detection if a new buffer is ready (playing) *or* the
+        // current time changed since last process (the user scrubbed or
+        // pause-stepped). Without the second condition, paused frames
+        // would never get re-detected after a seek.
+        let timeAdvanced: Bool = {
+            guard let last = lastProcessedTime else { return true }
+            return abs(CMTimeGetSeconds(time) - CMTimeGetSeconds(last)) > 0.01
+        }()
+        let hasNewBuffer = videoOutput.hasNewPixelBuffer(forItemTime: time)
+        guard hasNewBuffer || timeAdvanced else {
+            updatePoseAge()
+            ageOutIfStale()
+            return
+        }
         guard let pixelBuffer = videoOutput.copyPixelBuffer(
             forItemTime: time,
             itemTimeForDisplay: nil
-        ) else { return }
+        ) else {
+            updatePoseAge()
+            ageOutIfStale()
+            return
+        }
+        lastProcessedTime = time
 
         if imageSize == nil {
             imageSize = CGSize(
@@ -117,11 +153,54 @@ final class PoseStreamCoordinator: ObservableObject {
 
         let result = await detect(pixelBuffer: pixelBuffer)
         switch result {
-        case .success(let pose):
-            self.pose = pose
-            self.status = pose.map { .detected(jointCount: $0.joints.count) } ?? .noPerson
+        case .success(let detected):
+            if let detected {
+                self.pose = detected
+                self.lastSuccessTime = Date()
+                self.poseAge = 0
+                self.status = .detected(jointCount: detected.joints.count)
+            } else {
+                // Vision returned no observation — the dancer might have
+                // turned away, gone partially off-screen, or the frame's
+                // hard. Don't immediately clear the skeleton; hold for up
+                // to `staleAfter` so a single bad frame doesn't flicker.
+                handleMissedDetection(reason: .noPerson)
+            }
         case .failure(let error):
-            self.status = .error(error.localizedDescription)
+            handleMissedDetection(reason: .error(error.localizedDescription))
+        }
+    }
+
+    /// Keeps the last successful pose visible until it's older than
+    /// `staleAfter`. After that, clears it and surfaces the miss reason.
+    private func handleMissedDetection(reason: Status) {
+        updatePoseAge()
+        if poseAge > Self.staleAfter {
+            pose = nil
+            status = reason
+        }
+        // Otherwise: keep showing the prior pose, leave status as it was —
+        // the overlay's fade-by-age makes the staleness visible without
+        // flickering the dashboard chip back and forth.
+    }
+
+    /// Called every tick whether we re-ran detection or not, so the view
+    /// can fade the overlay smoothly between ticks.
+    private func updatePoseAge() {
+        guard let last = lastSuccessTime else {
+            poseAge = .infinity
+            return
+        }
+        poseAge = Date().timeIntervalSince(last)
+    }
+
+    /// When we skip detection (no new buffer, no scrub), we still want
+    /// stale poses to age out — otherwise the last pose would linger
+    /// indefinitely on a perfectly paused frame.
+    private func ageOutIfStale() {
+        if poseAge > Self.staleAfter, pose != nil {
+            pose = nil
+            status = .noPerson
         }
     }
 
