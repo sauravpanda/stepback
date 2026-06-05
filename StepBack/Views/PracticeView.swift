@@ -20,14 +20,23 @@ struct PracticeView: View {
     /// Single-tap on the video remains wired to play/pause so pausing
     /// doesn't require bringing controls back first.
     @State private var controlsHidden: Bool = false
+    @StateObject private var poseCoordinator: PoseStreamCoordinator
 
     init(clip: DanceClip) {
         self.clip = clip
+        // Share a single AVPlayer between the view model and the pose
+        // coordinator so the coordinator's video output reads frames from
+        // the *same* item the user is watching.
+        let sharedPlayer = AVPlayer()
         _vm = StateObject(
             wrappedValue: PracticePlayerViewModel(
                 assetIdentifier: clip.assetIdentifier,
-                localFileURL: clip.preferredLocalFileURL
+                localFileURL: clip.preferredLocalFileURL,
+                player: sharedPlayer
             )
+        )
+        _poseCoordinator = StateObject(
+            wrappedValue: PoseStreamCoordinator(player: sharedPlayer)
         )
     }
 
@@ -64,6 +73,26 @@ struct PracticeView: View {
                             .foregroundStyle(Theme.Color.textPrimary)
                     }
                     .accessibilityLabel("Edit clip")
+                    Button {
+                        if poseCoordinator.isActive {
+                            poseCoordinator.stop()
+                        } else {
+                            poseCoordinator.start()
+                        }
+                    } label: {
+                        Image(systemName: poseCoordinator.isActive
+                            ? "figure.walk.motion"
+                            : "figure.walk"
+                        )
+                        .foregroundStyle(poseCoordinator.isActive
+                            ? Theme.Color.accent
+                            : Theme.Color.textPrimary
+                        )
+                    }
+                    .accessibilityLabel(poseCoordinator.isActive
+                        ? "Disable pose detection"
+                        : "Enable pose detection"
+                    )
                     Button {
                         comparePickerPresented = true
                     } label: {
@@ -104,7 +133,10 @@ struct PracticeView: View {
             configureBeatPulse()
         }
         .onAppear { vm.enableNowPlaying(for: clip) }
-        .onDisappear { vm.disableNowPlaying() }
+        .onDisappear {
+            vm.disableNowPlaying()
+            poseCoordinator.stop()
+        }
         .keepScreenAwake()
         .sheet(isPresented: $comparePickerPresented) {
             CompareClipPicker(excludedID: clip.id) { picked in
@@ -166,12 +198,31 @@ struct PracticeView: View {
                 // claim leftover vertical space; controls keep their intrinsic
                 // height and float beneath.
                 ZoomablePlayerContainer(onSingleTap: { vm.togglePlayPause() }) {
-                    PlayerSurface(player: vm.player)
-                        .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
+                    ZStack {
+                        PlayerSurface(player: vm.player)
+                            .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
+                        if poseCoordinator.isActive {
+                            // Mirror the overlay alongside the video so the
+                            // skeleton tracks the actual displayed body, not
+                            // the original frame's body.
+                            PoseOverlay(
+                                pose: poseCoordinator.pose,
+                                imageSize: poseCoordinator.imageSize
+                            )
+                            .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black)
                 .layoutPriority(1)
+                .overlay(alignment: .topLeading) {
+                    if poseCoordinator.isActive {
+                        PoseStatusChip(status: poseCoordinator.status)
+                            .padding(.leading, 10)
+                            .padding(.top, 10)
+                    }
+                }
 
                 if !controlsHidden {
                     controls
