@@ -50,6 +50,10 @@ struct PoseDetectionService: Sendable {
         orientation: CGImagePropertyOrientation = .up
     ) throws -> DetectedPose? {
         let request = VNDetectHumanBodyPoseRequest()
+        // Pin to the newest revision the OS supports rather than letting
+        // the default float — same model behaviour from device to device,
+        // and we get whatever accuracy improvements ship with each iOS.
+        request.revision = VNDetectHumanBodyPoseRequest.currentRevision
         let handler = VNImageRequestHandler(
             cvPixelBuffer: pixelBuffer,
             orientation: orientation,
@@ -60,7 +64,14 @@ struct PoseDetectionService: Sendable {
         } catch {
             throw PoseDetectionError.visionFailed(error.localizedDescription)
         }
-        guard let observation = (request.results ?? []).first else { return nil }
+        // Pick the highest overall-confidence observation, not just the
+        // first. With multiple people in frame (common at social dances)
+        // the model returns them in essentially arbitrary order, which
+        // made the skeleton jump between dancers. Highest confidence is
+        // a stable proxy for "the most clearly-visible person."
+        let observations = request.results ?? []
+        guard let observation = observations.max(by: { $0.confidence < $1.confidence })
+        else { return nil }
         let allPoints: [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]
         do {
             allPoints = try observation.recognizedPoints(.all)

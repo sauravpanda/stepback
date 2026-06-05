@@ -2,6 +2,7 @@ import AVFoundation
 import Combine
 import CoreVideo
 import Foundation
+import ImageIO
 
 /// Drives pose detection against an `AVPlayer`'s currently-displayed frame.
 /// Attaches an `AVPlayerItemVideoOutput` to whatever item is current, polls
@@ -32,10 +33,12 @@ final class PoseStreamCoordinator: ObservableObject {
     /// stale frame vs reading the current one.
     @Published private(set) var poseAge: TimeInterval = .infinity
 
-    /// 100ms tick. At 10Hz, Vision's body-pose request runs cheaply enough
-    /// to stay out of the main thread budget (work happens on
-    /// `detectionQueue`) while still feeling reactive on the overlay.
-    private static let tickInterval: Duration = .milliseconds(100)
+    /// 60ms tick (~16Hz). Was 100ms — bumped up because Vision routinely
+    /// misses individual frames on dance footage and more attempts per
+    /// second materially improves coverage. Detection runs on a background
+    /// queue so the main thread isn't squeezed; the actual cycle time is
+    /// roughly tickInterval + detection_time (~10-30ms on iPhone 12+).
+    private static let tickInterval: Duration = .milliseconds(60)
     /// Last successful pose stays visible for this long after detection
     /// starts failing. Bridges the flicker when Vision drops a frame or
     /// two on hard footage (motion blur, partial occlusion, etc).
@@ -51,6 +54,13 @@ final class PoseStreamCoordinator: ObservableObject {
     private var tickTask: Task<Void, Never>?
     private var lastSuccessTime: Date?
     private var lastProcessedTime: CMTime?
+    /// Cached `CGImagePropertyOrientation` derived from the current player
+    /// item's video track preferredTransform. Set asynchronously after the
+    /// item swaps; until resolved we default to `.up`, which matches the
+    /// pre-orientation behaviour.
+    private var orientation: CGImagePropertyOrientation = .up
+    private weak var orientationItem: AVPlayerItem?
+    private var orientationTask: Task<Void, Never>?
 
     init(
         player: AVPlayer,
@@ -115,8 +125,47 @@ final class PoseStreamCoordinator: ObservableObject {
         }
     }
 
+    /// Resolves the current item's video orientation from its preferred
+    /// transform. Cached by item identity so we don't re-load the track
+    /// on every tick — and so swapping items (after trim, after reload)
+    /// triggers a fresh resolution. Until the async load completes we
+    /// stay at the cached value, which on first item is `.up`.
+    private func updateOrientationIfNeeded() {
+        guard let item = player.currentItem else { return }
+        if item === orientationItem { return }
+        orientationItem = item
+        // Reset cached imageSize so it gets re-derived with the new
+        // orientation on the next pixel-buffer copy.
+        imageSize = nil
+        orientationTask?.cancel()
+        orientationTask = Task { [weak self] in
+            let resolved = await Self.resolveOrientation(for: item)
+            await MainActor.run {
+                guard let self else { return }
+                guard self.orientationItem === item else { return }
+                self.orientation = resolved
+            }
+        }
+    }
+
+    /// Async-loads the video track's preferred transform off the main
+    /// actor so the tick doesn't block on it.
+    nonisolated private static func resolveOrientation(
+        for item: AVPlayerItem
+    ) async -> CGImagePropertyOrientation {
+        do {
+            let tracks = try await item.asset.loadTracks(withMediaType: .video)
+            guard let track = tracks.first else { return .up }
+            let transform = try await track.load(.preferredTransform)
+            return CGImagePropertyOrientation(transform: transform)
+        } catch {
+            return .up
+        }
+    }
+
     private func tick() async {
         attachOutputIfNeeded()
+        updateOrientationIfNeeded()
         guard player.currentItem != nil else { return }
         let time = player.currentTime()
 
@@ -145,13 +194,20 @@ final class PoseStreamCoordinator: ObservableObject {
         lastProcessedTime = time
 
         if imageSize == nil {
-            imageSize = CGSize(
+            let raw = CGSize(
                 width: CVPixelBufferGetWidth(pixelBuffer),
                 height: CVPixelBufferGetHeight(pixelBuffer)
             )
+            // Vision returns joint coords in the upright (orientation-
+            // corrected) frame, so we need to surface the *displayed*
+            // dimensions for the overlay's aspect-fit math — that means
+            // swapping width and height for 90°-rotated sources.
+            imageSize = orientation.swapsAxes
+                ? CGSize(width: raw.height, height: raw.width)
+                : raw
         }
 
-        let result = await detect(pixelBuffer: pixelBuffer)
+        let result = await detect(pixelBuffer: pixelBuffer, orientation: orientation)
         switch result {
         case .success(let detected):
             if let detected {
@@ -207,12 +263,15 @@ final class PoseStreamCoordinator: ObservableObject {
     /// Runs the synchronous Vision request on `detectionQueue` and bridges
     /// back to MainActor via a continuation. We capture `detector` by value
     /// so the queue closure doesn't touch `self` across the actor boundary.
-    private func detect(pixelBuffer: CVPixelBuffer) async -> Result<DetectedPose?, Error> {
+    private func detect(
+        pixelBuffer: CVPixelBuffer,
+        orientation: CGImagePropertyOrientation
+    ) async -> Result<DetectedPose?, Error> {
         let detector = self.detector
         return await withCheckedContinuation { continuation in
             detectionQueue.async {
                 let outcome = Result {
-                    try detector.detect(in: pixelBuffer)
+                    try detector.detect(in: pixelBuffer, orientation: orientation)
                 }
                 continuation.resume(returning: outcome)
             }
