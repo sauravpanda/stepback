@@ -54,6 +54,10 @@ final class PoseStreamCoordinator: ObservableObject {
     private var tickTask: Task<Void, Never>?
     private var lastSuccessTime: Date?
     private var lastProcessedTime: CMTime?
+    /// Per-joint One-Euro smoothing applied to every detected pose before
+    /// publishing, so the rendered skeleton (and anything derived from it)
+    /// stops shimmering frame-to-frame.
+    private var smoother = PoseSmoother()
     /// Cached `CGImagePropertyOrientation` derived from the current player
     /// item's video track preferredTransform. Set asynchronously after the
     /// item swaps; until resolved we default to `.up`, which matches the
@@ -85,6 +89,7 @@ final class PoseStreamCoordinator: ObservableObject {
         lastSuccessTime = nil
         lastProcessedTime = nil
         poseAge = .infinity
+        smoother.reset()
         attachOutputIfNeeded()
         tickTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -103,6 +108,7 @@ final class PoseStreamCoordinator: ObservableObject {
         lastSuccessTime = nil
         lastProcessedTime = nil
         poseAge = .infinity
+        smoother.reset()
         detachOutput()
     }
 
@@ -137,6 +143,8 @@ final class PoseStreamCoordinator: ObservableObject {
         // Reset cached imageSize so it gets re-derived with the new
         // orientation on the next pixel-buffer copy.
         imageSize = nil
+        // New clip → forget joint smoothing history.
+        smoother.reset()
         orientationTask?.cancel()
         orientationTask = Task { [weak self] in
             let resolved = await Self.resolveOrientation(for: item)
@@ -211,10 +219,18 @@ final class PoseStreamCoordinator: ObservableObject {
         switch result {
         case .success(let detected):
             if let detected {
-                self.pose = detected
+                // Smooth against media time so joint velocity (and the
+                // adaptive cutoff) is a stable physical quantity regardless
+                // of playback speed; a large media-time jump (scrub) resets
+                // the filters inside the smoother.
+                let smoothed = smoother.smooth(
+                    detected,
+                    timestamp: CMTimeGetSeconds(time)
+                )
+                self.pose = smoothed
                 self.lastSuccessTime = Date()
                 self.poseAge = 0
-                self.status = .detected(jointCount: detected.joints.count)
+                self.status = .detected(jointCount: smoothed.joints.count)
             } else {
                 // Vision returned no observation — the dancer might have
                 // turned away, gone partially off-screen, or the frame's
