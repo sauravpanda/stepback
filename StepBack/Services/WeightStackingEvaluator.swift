@@ -59,4 +59,65 @@ enum WeightStackingEvaluator {
         let threshold: Double = .pi / 4   // 45° = full red
         return max(0, 1.0 - angleFromAxis / threshold)
     }
+
+    // MARK: - Center of mass
+
+    /// Estimates a 2-D centre of mass from the torso joints. The pelvis
+    /// carries the bulk of body mass, so the hip midpoint is weighted more
+    /// than the shoulder midpoint; the blend lands roughly at the navel,
+    /// which is a serviceable single-camera CoM proxy.
+    ///
+    /// Requires *both* joints of a pair to use that pair — a lone hip joint
+    /// is not the pelvis centre, and trusting it would skew the CoM toward
+    /// whichever side Vision happened to see. Returns nil when neither pair
+    /// is fully available.
+    static func centerOfMass(
+        leftHip: CGPoint?, rightHip: CGPoint?,
+        leftShoulder: CGPoint?, rightShoulder: CGPoint?,
+        hipWeight: Double = 0.65
+    ) -> CGPoint? {
+        let hipMid = midpoint(leftHip, rightHip)
+        let shoulderMid = midpoint(leftShoulder, rightShoulder)
+
+        switch (hipMid, shoulderMid) {
+        case let (hip?, shoulder?):
+            let w = max(0, min(1, hipWeight))
+            return CGPoint(
+                x: hip.x * w + shoulder.x * (1 - w),
+                y: hip.y * w + shoulder.y * (1 - w)
+            )
+        case let (hip?, nil):
+            return hip
+        case let (nil, shoulder?):
+            return shoulder
+        case (nil, nil):
+            return nil
+        }
+    }
+
+    /// How well the centre of mass is stacked over a foot, measured
+    /// horizontally. 1.0 = directly over an ankle (stacked), 0.5 = midway
+    /// between the feet (weight split / uncommitted), 0.0 = a full
+    /// stance-width or more outside the nearer foot (off balance).
+    ///
+    /// Normalising by stance width makes the score scale-free: a wide base
+    /// and a narrow base both read "stacked" when the CoM is over a foot.
+    /// `minStance` floors the denominator so feet-together stances don't
+    /// divide by ~zero.
+    static func comStackingScore(
+        comX: CGFloat,
+        leftAnkleX: CGFloat,
+        rightAnkleX: CGFloat,
+        minStance: CGFloat = 1
+    ) -> Double {
+        let stance = abs(leftAnkleX - rightAnkleX)
+        let reference = max(stance, minStance)
+        let nearest = min(abs(comX - leftAnkleX), abs(comX - rightAnkleX))
+        return max(0, 1 - Double(nearest / reference))
+    }
+
+    private static func midpoint(_ a: CGPoint?, _ b: CGPoint?) -> CGPoint? {
+        guard let a, let b else { return nil }
+        return CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
+    }
 }

@@ -116,4 +116,112 @@ final class WeightStackingEvaluatorTests: XCTestCase {
         )
         XCTAssertEqual(score, 1.0, accuracy: accuracy)
     }
+
+    // MARK: - Center of mass
+
+    func testCenterOfMassBlendsHipAndShoulderWeightedToHip() {
+        // Hips at y=200, shoulders at y=100; default hipWeight 0.65 →
+        // y = 200*0.65 + 100*0.35 = 165. x is the same column so stays 50.
+        let com = WeightStackingEvaluator.centerOfMass(
+            leftHip: CGPoint(x: 40, y: 200),
+            rightHip: CGPoint(x: 60, y: 200),
+            leftShoulder: CGPoint(x: 40, y: 100),
+            rightShoulder: CGPoint(x: 60, y: 100)
+        )
+        XCTAssertEqual(com?.x ?? -1, 50, accuracy: accuracy)
+        XCTAssertEqual(com?.y ?? -1, 165, accuracy: accuracy)
+    }
+
+    func testCenterOfMassUsesHipsOnlyWhenShouldersMissing() {
+        let com = WeightStackingEvaluator.centerOfMass(
+            leftHip: CGPoint(x: 40, y: 200),
+            rightHip: CGPoint(x: 60, y: 200),
+            leftShoulder: nil,
+            rightShoulder: nil
+        )
+        XCTAssertEqual(com?.x ?? -1, 50, accuracy: accuracy)
+        XCTAssertEqual(com?.y ?? -1, 200, accuracy: accuracy)
+    }
+
+    func testCenterOfMassUsesShouldersOnlyWhenHipsMissing() {
+        let com = WeightStackingEvaluator.centerOfMass(
+            leftHip: nil,
+            rightHip: nil,
+            leftShoulder: CGPoint(x: 40, y: 100),
+            rightShoulder: CGPoint(x: 60, y: 100)
+        )
+        XCTAssertEqual(com?.x ?? -1, 50, accuracy: accuracy)
+        XCTAssertEqual(com?.y ?? -1, 100, accuracy: accuracy)
+    }
+
+    func testCenterOfMassRequiresBothJointsOfAPair() {
+        // A lone hip + lone shoulder isn't enough for either midpoint.
+        let com = WeightStackingEvaluator.centerOfMass(
+            leftHip: CGPoint(x: 40, y: 200),
+            rightHip: nil,
+            leftShoulder: CGPoint(x: 40, y: 100),
+            rightShoulder: nil
+        )
+        XCTAssertNil(com)
+    }
+
+    func testCenterOfMassNilWhenNothingAvailable() {
+        XCTAssertNil(WeightStackingEvaluator.centerOfMass(
+            leftHip: nil, rightHip: nil, leftShoulder: nil, rightShoulder: nil
+        ))
+    }
+
+    // MARK: - CoM stacking score
+
+    func testStackingScoreOneOverLeftAnkle() {
+        let score = WeightStackingEvaluator.comStackingScore(
+            comX: 100, leftAnkleX: 100, rightAnkleX: 200
+        )
+        XCTAssertEqual(score, 1.0, accuracy: accuracy)
+    }
+
+    func testStackingScoreOneOverRightAnkle() {
+        let score = WeightStackingEvaluator.comStackingScore(
+            comX: 200, leftAnkleX: 100, rightAnkleX: 200
+        )
+        XCTAssertEqual(score, 1.0, accuracy: accuracy)
+    }
+
+    func testStackingScoreHalfAtMidpoint() {
+        // CoM dead-centre between feet → nearest ankle is half a stance away
+        // → 0.5 (weight split, not stacked).
+        let score = WeightStackingEvaluator.comStackingScore(
+            comX: 150, leftAnkleX: 100, rightAnkleX: 200
+        )
+        XCTAssertEqual(score, 0.5, accuracy: accuracy)
+    }
+
+    func testStackingScoreZeroAFullStanceOutside() {
+        // One stance-width beyond the right ankle.
+        let score = WeightStackingEvaluator.comStackingScore(
+            comX: 300, leftAnkleX: 100, rightAnkleX: 200
+        )
+        XCTAssertEqual(score, 0.0, accuracy: accuracy)
+    }
+
+    func testStackingScoreClampsBelowZeroWayOutside() {
+        let score = WeightStackingEvaluator.comStackingScore(
+            comX: 1000, leftAnkleX: 100, rightAnkleX: 200
+        )
+        XCTAssertEqual(score, 0.0, accuracy: accuracy)
+    }
+
+    func testStackingScoreFeetTogetherUsesMinStanceFloor() {
+        // Ankles coincide; minStance floors the denominator so we don't
+        // divide by zero. CoM exactly on the foot → 1.
+        let onFoot = WeightStackingEvaluator.comStackingScore(
+            comX: 100, leftAnkleX: 100, rightAnkleX: 100, minStance: 10
+        )
+        XCTAssertEqual(onFoot, 1.0, accuracy: accuracy)
+        // Off by a full floor → 0.
+        let offFoot = WeightStackingEvaluator.comStackingScore(
+            comX: 110, leftAnkleX: 100, rightAnkleX: 100, minStance: 10
+        )
+        XCTAssertEqual(offFoot, 0.0, accuracy: accuracy)
+    }
 }

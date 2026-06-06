@@ -50,6 +50,7 @@ struct PoseOverlay: View {
                 Canvas { context, _ in
                     drawBones(pose: pose, displayRect: rect, context: context)
                     drawJoints(pose: pose, displayRect: rect, context: context)
+                    drawCenterOfMass(pose: pose, displayRect: rect, context: context)
                 }
                 .opacity(freshnessOpacity)
             }
@@ -128,6 +129,88 @@ struct PoseOverlay: View {
                 Path(ellipseIn: rect),
                 with: .color(Color.white.opacity(alpha * 0.85))
             )
+        }
+    }
+
+    /// Draws the centre-of-mass plumb line — the actual weight-stacking
+    /// cue. A vertical line dropped from the estimated CoM shows, at a
+    /// glance, whether the dancer's mass is stacked over a foot. The line
+    /// is coloured by `comStackingScore`: green over a foot, yellow midway
+    /// between the feet, red leaning past the base of support.
+    private func drawCenterOfMass(
+        pose: DetectedPose,
+        displayRect: CGRect,
+        context: GraphicsContext
+    ) {
+        let lookup = Dictionary(
+            uniqueKeysWithValues: pose.joints.map { ($0.name, $0) }
+        )
+        func point(_ name: VNHumanBodyPoseObservation.JointName) -> CGPoint? {
+            guard let joint = lookup[name] else { return nil }
+            return PoseCoordinateTransform.viewPoint(
+                normalizedImagePoint: joint.normalizedPosition,
+                displayRect: displayRect
+            )
+        }
+
+        guard let com = WeightStackingEvaluator.centerOfMass(
+            leftHip: point(.leftHip),
+            rightHip: point(.rightHip),
+            leftShoulder: point(.leftShoulder),
+            rightShoulder: point(.rightShoulder)
+        ) else { return }
+
+        let leftAnkle = point(.leftAnkle)
+        let rightAnkle = point(.rightAnkle)
+
+        // Colour the line by stacking quality when we can see both feet;
+        // otherwise stay neutral rather than make a claim we can't support.
+        let tint: Color
+        if let leftAnkle, let rightAnkle {
+            let score = WeightStackingEvaluator.comStackingScore(
+                comX: com.x,
+                leftAnkleX: leftAnkle.x,
+                rightAnkleX: rightAnkle.x,
+                minStance: max(1, displayRect.width * 0.02)
+            )
+            tint = Color.stackingColor(for: score)
+        } else {
+            tint = Theme.Color.textPrimary
+        }
+
+        // Drop the plumb line from the CoM to the lower foot (or the bottom
+        // of the frame if feet aren't visible), so the eye can compare the
+        // line against the base of support.
+        let bottomY = [leftAnkle?.y, rightAnkle?.y]
+            .compactMap { $0 }
+            .max() ?? displayRect.maxY
+
+        var line = Path()
+        line.move(to: CGPoint(x: com.x, y: com.y))
+        line.addLine(to: CGPoint(x: com.x, y: max(com.y, bottomY)))
+        context.stroke(
+            line,
+            with: .color(tint.opacity(0.9)),
+            style: StrokeStyle(lineWidth: 2, dash: [6, 5])
+        )
+
+        // CoM marker — a ringed dot so it stands apart from the white joints.
+        let r: CGFloat = 6
+        let comRect = CGRect(x: com.x - r, y: com.y - r, width: r * 2, height: r * 2)
+        context.fill(Path(ellipseIn: comRect), with: .color(tint))
+        context.stroke(
+            Path(ellipseIn: comRect.insetBy(dx: -2, dy: -2)),
+            with: .color(.white.opacity(0.9)),
+            lineWidth: 1.5
+        )
+
+        // Base-of-support tick at each visible ankle, so "is the line over a
+        // foot?" is answerable by eye.
+        for ankle in [leftAnkle, rightAnkle].compactMap({ $0 }) {
+            var tick = Path()
+            tick.move(to: CGPoint(x: ankle.x - 10, y: ankle.y))
+            tick.addLine(to: CGPoint(x: ankle.x + 10, y: ankle.y))
+            context.stroke(tick, with: .color(tint.opacity(0.8)), lineWidth: 2)
         }
     }
 
