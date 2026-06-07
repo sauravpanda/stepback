@@ -58,6 +58,9 @@ final class PoseStreamCoordinator: ObservableObject {
     /// publishing, so the rendered skeleton (and anything derived from it)
     /// stops shimmering frame-to-frame.
     private var smoother = PoseSmoother()
+    /// Locks onto one person across frames so the skeleton doesn't jump
+    /// between dancers when there are several in shot.
+    private var tracker = PoseTracker()
     /// Cached `CGImagePropertyOrientation` derived from the current player
     /// item's video track preferredTransform. Set asynchronously after the
     /// item swaps; until resolved we default to `.up`, which matches the
@@ -95,6 +98,7 @@ final class PoseStreamCoordinator: ObservableObject {
         lastProcessedTime = nil
         poseAge = .infinity
         smoother.reset()
+        tracker.reset()
         attachOutputIfNeeded()
         tickTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -114,6 +118,7 @@ final class PoseStreamCoordinator: ObservableObject {
         lastProcessedTime = nil
         poseAge = .infinity
         smoother.reset()
+        tracker.reset()
         detachOutput()
     }
 
@@ -148,8 +153,9 @@ final class PoseStreamCoordinator: ObservableObject {
         // Reset cached imageSize so it gets re-derived with the new
         // orientation on the next pixel-buffer copy.
         imageSize = nil
-        // New clip → forget joint smoothing history.
+        // New clip → forget joint smoothing history and the tracked person.
         smoother.reset()
+        tracker.reset()
         orientationTask?.cancel()
         orientationTask = Task { [weak self] in
             let resolved = await Self.resolveOrientation(for: item)
@@ -222,14 +228,22 @@ final class PoseStreamCoordinator: ObservableObject {
 
         let result = await detect(pixelBuffer: pixelBuffer, orientation: orientation)
         switch result {
-        case .success(let detected):
-            if let detected {
+        case .success(let candidates):
+            // Lock onto one person across frames. Returns nil only when the
+            // frame had no candidates at all.
+            if let selection = tracker.select(from: candidates) {
+                // On a fresh lock or a re-anchor to a different person, drop
+                // the smoothing history — otherwise the filter would smear a
+                // path between two different bodies.
+                if !selection.isContinuation {
+                    smoother.reset()
+                }
                 // Smooth against media time so joint velocity (and the
                 // adaptive cutoff) is a stable physical quantity regardless
                 // of playback speed; a large media-time jump (scrub) resets
                 // the filters inside the smoother.
                 let smoothed = smoother.smooth(
-                    detected,
+                    selection.pose,
                     timestamp: CMTimeGetSeconds(time)
                 )
                 self.pose = smoothed
@@ -237,10 +251,10 @@ final class PoseStreamCoordinator: ObservableObject {
                 self.poseAge = 0
                 self.status = .detected(jointCount: smoothed.joints.count)
             } else {
-                // Vision returned no observation — the dancer might have
-                // turned away, gone partially off-screen, or the frame's
-                // hard. Don't immediately clear the skeleton; hold for up
-                // to `staleAfter` so a single bad frame doesn't flicker.
+                // No person in this frame — the dancer might have turned
+                // away, gone partially off-screen, or the frame's hard.
+                // Don't immediately clear the skeleton; hold for up to
+                // `staleAfter` so a single bad frame doesn't flicker.
                 handleMissedDetection(reason: .noPerson)
             }
         case .failure(let error):
@@ -287,12 +301,12 @@ final class PoseStreamCoordinator: ObservableObject {
     private func detect(
         pixelBuffer: CVPixelBuffer,
         orientation: CGImagePropertyOrientation
-    ) async -> Result<DetectedPose?, Error> {
+    ) async -> Result<[DetectedPose], Error> {
         let detector = self.detector
         return await withCheckedContinuation { continuation in
             detectionQueue.async {
                 let outcome = Result {
-                    try detector.detect(in: pixelBuffer, orientation: orientation)
+                    try detector.detectPoses(in: pixelBuffer, orientation: orientation)
                 }
                 continuation.resume(returning: outcome)
             }

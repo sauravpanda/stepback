@@ -45,10 +45,15 @@ struct PoseDetectionService: Sendable {
         self.confidenceThreshold = confidenceThreshold
     }
 
-    func detect(
+    /// Detects every person Vision finds in the frame, returning one
+    /// `DetectedPose` per observation that has at least one joint above the
+    /// confidence floor. Selecting *which* person to follow is the caller's
+    /// job (see `PoseTracker`) — doing it here, per-frame and stateless, is
+    /// exactly what made the skeleton jump between dancers.
+    func detectPoses(
         in pixelBuffer: CVPixelBuffer,
         orientation: CGImagePropertyOrientation = .up
-    ) throws -> DetectedPose? {
+    ) throws -> [DetectedPose] {
         let request = VNDetectHumanBodyPoseRequest()
         // Pin to the newest revision the OS supports rather than letting
         // the default float — same model behaviour from device to device,
@@ -64,28 +69,22 @@ struct PoseDetectionService: Sendable {
         } catch {
             throw PoseDetectionError.visionFailed(error.localizedDescription)
         }
-        // Pick the highest overall-confidence observation, not just the
-        // first. With multiple people in frame (common at social dances)
-        // the model returns them in essentially arbitrary order, which
-        // made the skeleton jump between dancers. Highest confidence is
-        // a stable proxy for "the most clearly-visible person."
+
         let observations = request.results ?? []
-        guard let observation = observations.max(by: { $0.confidence < $1.confidence })
-        else { return nil }
-        let allPoints: [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]
-        do {
-            allPoints = try observation.recognizedPoints(.all)
-        } catch {
-            throw PoseDetectionError.visionFailed(error.localizedDescription)
+        return observations.compactMap { observation -> DetectedPose? in
+            // A single unreadable observation shouldn't fail the whole frame.
+            guard let allPoints = try? observation.recognizedPoints(.all) else {
+                return nil
+            }
+            let joints = allPoints.compactMap { (name, point) -> DetectedJoint? in
+                guard point.confidence >= confidenceThreshold else { return nil }
+                return DetectedJoint(
+                    name: name,
+                    normalizedPosition: point.location,
+                    confidence: point.confidence
+                )
+            }
+            return joints.isEmpty ? nil : DetectedPose(joints: joints)
         }
-        let joints = allPoints.compactMap { (name, point) -> DetectedJoint? in
-            guard point.confidence >= confidenceThreshold else { return nil }
-            return DetectedJoint(
-                name: name,
-                normalizedPosition: point.location,
-                confidence: point.confidence
-            )
-        }
-        return joints.isEmpty ? nil : DetectedPose(joints: joints)
     }
 }
