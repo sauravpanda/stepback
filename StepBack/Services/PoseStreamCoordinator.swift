@@ -72,9 +72,14 @@ final class PoseStreamCoordinator: ObservableObject {
     ) {
         self.player = player
         self.detector = detector
-        videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: [
-            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
-        ])
+        // Native output settings (nil) rather than forcing SDR 32BGRA.
+        // Forcing an 8-bit SDR format makes iOS collapse the *displayed*
+        // AVPlayerLayer to SDR for HDR (Dolby Vision) source clips — which
+        // most iPhone footage is — and the HDR→SDR tone-map visibly lifts
+        // mid-tones ("the video got brighter when pose is on"). Letting the
+        // output vend native frames preserves the HDR display pipeline;
+        // Vision's VNImageRequestHandler accepts the native pixel buffers.
+        videoOutput = AVPlayerItemVideoOutput(outputSettings: nil)
     }
 
     deinit {

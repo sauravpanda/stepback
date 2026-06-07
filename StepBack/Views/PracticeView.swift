@@ -134,6 +134,13 @@ struct PracticeView: View {
         }
         .onAppear { vm.enableNowPlaying(for: clip) }
         .onDisappear {
+            // Stop playback when leaving the screen. Without this the player
+            // keeps going after you navigate back (audio session is .playback
+            // + Background Audio), and opening another clip stacks a second
+            // player over the first → overlapping audio. onDisappear fires on
+            // *navigation*, not on app-backgrounding, so locking the phone
+            // still keeps audio playing as intended.
+            vm.pause()
             vm.disableNowPlaying()
             poseCoordinator.stop()
         }
