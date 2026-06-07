@@ -11,12 +11,18 @@ struct ZoomablePlayerContainer<Content: View>: View {
 
     private let content: Content
     private let onSingleTap: (() -> Void)?
+    /// Reports a long-press as a fraction (0…1) of the *un-zoomed* container,
+    /// so callers can map it back through their own letterbox/mirror to image
+    /// space. Used for "hold a dancer to track them."
+    private let onLongPressLocated: ((CGPoint) -> Void)?
 
     init(
         onSingleTap: (() -> Void)? = nil,
+        onLongPressLocated: ((CGPoint) -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.onSingleTap = onSingleTap
+        self.onLongPressLocated = onLongPressLocated
         self.content = content()
     }
 
@@ -69,6 +75,25 @@ struct ZoomablePlayerContainer<Content: View>: View {
                     .onTapGesture(count: 1) {
                         onSingleTap?()
                     }
+                    // Long-press to pin a person. Sequenced before a
+                    // zero-distance drag so we can read the touch location;
+                    // simultaneous so it coexists with pinch/pan, and the
+                    // 0.45s hold keeps it from firing on taps or quick pans.
+                    .simultaneousGesture(
+                        LongPressGesture(minimumDuration: 0.45)
+                            .sequenced(before: DragGesture(minimumDistance: 0))
+                            .onEnded { value in
+                                if case .second(true, let drag?) = value {
+                                    let fraction = PoseCoordinateTransform.unzoomedFraction(
+                                        location: drag.location,
+                                        containerSize: proxy.size,
+                                        scale: scale,
+                                        offset: offset
+                                    )
+                                    onLongPressLocated?(fraction)
+                                }
+                            }
+                    )
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
         }

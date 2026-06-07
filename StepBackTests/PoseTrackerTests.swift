@@ -85,6 +85,64 @@ final class PoseTrackerTests: XCTestCase {
         XCTAssertEqual(sel?.pose, highConf)
     }
 
+    // MARK: - Pinning
+
+    func testPinFollowsNearestToPinnedPointEvenIfFarFromPriorLock() {
+        var tracker = PoseTracker(gate: 0.22)
+        _ = tracker.select(from: [pose(at: CGPoint(x: 0.2, y: 0.5), count: 6)])
+        // User long-presses a different dancer at x=0.8.
+        tracker.pin(to: CGPoint(x: 0.8, y: 0.5))
+        XCTAssertTrue(tracker.isPinned)
+        let pinnedOne = pose(at: CGPoint(x: 0.82, y: 0.5), count: 3)
+        let sel = tracker.select(from: [
+            pose(at: CGPoint(x: 0.2, y: 0.5), count: 6),  // prominent, but not pinned
+            pinnedOne,
+        ])
+        XCTAssertEqual(sel?.pose, pinnedOne)
+    }
+
+    func testPinnedModeHoldsRatherThanReanchoringWhenPersonGone() {
+        var tracker = PoseTracker(gate: 0.22)
+        tracker.pin(to: CGPoint(x: 0.3, y: 0.5))
+        _ = tracker.select(from: [pose(at: CGPoint(x: 0.3, y: 0.5), count: 4)])
+        // Pinned person vanishes; only a far candidate remains. Auto mode
+        // would grab it — pinned mode must hold (nil).
+        let sel = tracker.select(from: [pose(at: CGPoint(x: 0.9, y: 0.9), count: 8)])
+        XCTAssertNil(sel, "pinned tracker should hold, not jump to another dancer")
+    }
+
+    func testPinnedPersonReacquiredWhenTheyReturn() {
+        var tracker = PoseTracker(gate: 0.22)
+        tracker.pin(to: CGPoint(x: 0.3, y: 0.5))
+        _ = tracker.select(from: [pose(at: CGPoint(x: 0.3, y: 0.5), count: 4)])
+        _ = tracker.select(from: [pose(at: CGPoint(x: 0.9, y: 0.9), count: 8)])  // gone → held
+        // They return near where they were pinned.
+        let returned = pose(at: CGPoint(x: 0.32, y: 0.5), count: 4)
+        let sel = tracker.select(from: [returned])
+        XCTAssertEqual(sel?.pose, returned)
+    }
+
+    func testUnpinReturnsToAutoReanchoring() {
+        var tracker = PoseTracker(gate: 0.22)
+        tracker.pin(to: CGPoint(x: 0.3, y: 0.5))
+        _ = tracker.select(from: [pose(at: CGPoint(x: 0.3, y: 0.5), count: 4)])
+        tracker.unpin()
+        XCTAssertFalse(tracker.isPinned)
+        // A far prominent candidate should now be picked up (auto re-anchor).
+        let other = pose(at: CGPoint(x: 0.9, y: 0.9), count: 8)
+        let sel = tracker.select(from: [other])
+        XCTAssertEqual(sel?.pose, other)
+        XCTAssertEqual(sel?.isContinuation, false)
+    }
+
+    func testResetClearsPin() {
+        var tracker = PoseTracker()
+        tracker.pin(to: CGPoint(x: 0.5, y: 0.5))
+        tracker.reset()
+        XCTAssertFalse(tracker.isPinned)
+        XCTAssertNil(tracker.lastCentroid)
+    }
+
     // MARK: - Centroid
 
     func testCentroidIsAverageOfJoints() {

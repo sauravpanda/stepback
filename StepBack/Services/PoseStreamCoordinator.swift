@@ -27,6 +27,9 @@ final class PoseStreamCoordinator: ObservableObject {
     @Published private(set) var status: Status = .idle
     @Published private(set) var imageSize: CGSize?
     @Published private(set) var isActive: Bool = false
+    /// True when the user has long-pressed a specific dancer to follow. The
+    /// view surfaces this (lock badge + Release control).
+    @Published private(set) var isPinned: Bool = false
     /// Seconds since the most recent *successful* detection. Used by the
     /// overlay to fade the skeleton from solid (fresh) to transparent
     /// (about-to-be-cleared) so the dashboard can see when we're holding a
@@ -99,6 +102,7 @@ final class PoseStreamCoordinator: ObservableObject {
         poseAge = .infinity
         smoother.reset()
         tracker.reset()
+        isPinned = false
         attachOutputIfNeeded()
         tickTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -119,7 +123,25 @@ final class PoseStreamCoordinator: ObservableObject {
         poseAge = .infinity
         smoother.reset()
         tracker.reset()
+        isPinned = false
         detachOutput()
+    }
+
+    // MARK: - Person pinning
+
+    /// Locks tracking to the dancer nearest `imagePoint` (normalized Vision
+    /// coordinates, bottom-left origin). The next detection tick re-selects
+    /// around this point and then follows only that person.
+    func pin(at imagePoint: CGPoint) {
+        tracker.pin(to: imagePoint)
+        smoother.reset()  // new person → start smoothing fresh
+        isPinned = true
+    }
+
+    /// Releases the pin and returns to automatic tracking.
+    func unpin() {
+        tracker.unpin()
+        isPinned = false
     }
 
     // MARK: - Internals
@@ -156,6 +178,7 @@ final class PoseStreamCoordinator: ObservableObject {
         // New clip → forget joint smoothing history and the tracked person.
         smoother.reset()
         tracker.reset()
+        isPinned = false
         orientationTask?.cancel()
         orientationTask = Task { [weak self] in
             let resolved = await Self.resolveOrientation(for: item)

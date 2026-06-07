@@ -204,7 +204,10 @@ struct PracticeView: View {
                 // tall phone screens for any non-16:9 source). Let the video
                 // claim leftover vertical space; controls keep their intrinsic
                 // height and float beneath.
-                ZoomablePlayerContainer(onSingleTap: { vm.togglePlayPause() }) {
+                ZoomablePlayerContainer(
+                    onSingleTap: { vm.togglePlayPause() },
+                    onLongPressLocated: { fraction in pinDancer(atContainerFraction: fraction) }
+                ) {
                     ZStack {
                         PlayerSurface(player: vm.player)
                             .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
@@ -226,9 +229,12 @@ struct PracticeView: View {
                 .layoutPriority(1)
                 .overlay(alignment: .topLeading) {
                     if poseCoordinator.isActive {
-                        PoseStatusChip(status: poseCoordinator.status)
-                            .padding(.leading, 10)
-                            .padding(.top, 10)
+                        VStack(alignment: .leading, spacing: 6) {
+                            PoseStatusChip(status: poseCoordinator.status)
+                            poseTrackingControl
+                        }
+                        .padding(.leading, 10)
+                        .padding(.top, 10)
                     }
                 }
 
@@ -251,6 +257,59 @@ struct PracticeView: View {
             // stretches to the top of the controls.
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    /// Lock badge / release button (when pinned) or a hold-to-lock hint
+    /// (when tracking automatically). Sits under the pose status chip.
+    @ViewBuilder
+    private var poseTrackingControl: some View {
+        if poseCoordinator.isPinned {
+            Button {
+                poseCoordinator.unpin()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("Locked · Release")
+                        .font(.system(.caption2, design: .rounded, weight: .semibold))
+                }
+                .foregroundStyle(.black)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Theme.Color.accent, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        } else {
+            HStack(spacing: 5) {
+                Image(systemName: "hand.tap.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                Text("Hold a dancer to lock")
+                    .font(.system(.caption2, design: .rounded, weight: .semibold))
+            }
+            .foregroundStyle(Theme.Color.textPrimary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.black.opacity(0.55), in: Capsule())
+        }
+    }
+
+    /// Maps a long-press location (as a fraction of the un-zoomed player
+    /// container) back to a normalized Vision image point and pins the
+    /// dancer nearest it. No-op when pose detection is off or the frame
+    /// size isn't known yet.
+    private func pinDancer(atContainerFraction fraction: CGPoint) {
+        guard poseCoordinator.isActive, let imageSize = poseCoordinator.imageSize else { return }
+        let unitRect = PoseCoordinateTransform.displayRect(
+            imageSize: imageSize,
+            in: CGSize(width: 1, height: 1)
+        )
+        guard let imagePoint = PoseCoordinateTransform.normalizedImagePoint(
+            containerFraction: fraction,
+            unitDisplayRect: unitRect,
+            mirrored: vm.mirrored
+        ) else { return }
+        poseCoordinator.pin(at: imagePoint)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     private func loadErrorState(message: String) -> some View {

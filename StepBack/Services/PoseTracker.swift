@@ -25,40 +25,70 @@ struct PoseTracker {
     let gate: Double
 
     private(set) var lastCentroid: CGPoint?
+    /// When the user has explicitly chosen a dancer, we follow *only* them:
+    /// if the pinned person isn't near `lastCentroid` this frame we hold
+    /// (return nil) and wait rather than auto-grabbing someone else. This is
+    /// what stops the skeleton "randomly changing" on a crowded floor.
+    private(set) var isPinned: Bool = false
 
     init(gate: Double = 0.22) {
         self.gate = gate
     }
 
-    /// Returns the pose to display this frame, or nil if there were no
-    /// candidates. An empty frame leaves `lastCentroid` untouched so a brief
-    /// dropout doesn't lose the lock.
+    /// Returns the pose to display this frame, or nil if there's no person to
+    /// show. In auto mode an empty frame leaves `lastCentroid` untouched so a
+    /// brief dropout doesn't lose the lock; in pinned mode we also return nil
+    /// (and hold) when the pinned dancer isn't within `gate`.
     mutating func select(from candidates: [DetectedPose]) -> Selection? {
         guard !candidates.isEmpty else { return nil }
 
-        let selection: Selection
-        if let last = lastCentroid,
-           let nearest = candidates.min(by: {
-               Self.distance(Self.centroid($0), last)
-                   < Self.distance(Self.centroid($1), last)
-           }) {
-            if Self.distance(Self.centroid(nearest), last) <= gate {
-                selection = Selection(pose: nearest, isContinuation: true)
-            } else {
-                // Nearest candidate is too far — the tracked dancer likely
-                // left frame. Re-anchor.
-                selection = Selection(pose: mostProminent(candidates), isContinuation: false)
+        if let last = lastCentroid {
+            let nearest = candidates.min(by: {
+                Self.distance(Self.centroid($0), last)
+                    < Self.distance(Self.centroid($1), last)
+            })!
+            let near = Self.distance(Self.centroid(nearest), last) <= gate
+
+            if near {
+                lastCentroid = Self.centroid(nearest)
+                return Selection(pose: nearest, isContinuation: true)
             }
-        } else {
-            selection = Selection(pose: mostProminent(candidates), isContinuation: false)
+            if isPinned {
+                // Pinned dancer not in range — hold and keep waiting for them.
+                // Don't move lastCentroid; they may return near the same spot,
+                // or the user can re-pin someone else.
+                return nil
+            }
+            // Auto mode: the tracked person left — re-anchor to the most
+            // prominent candidate.
+            let prominent = mostProminent(candidates)
+            lastCentroid = Self.centroid(prominent)
+            return Selection(pose: prominent, isContinuation: false)
         }
 
-        lastCentroid = Self.centroid(selection.pose)
-        return selection
+        // No lock yet (auto, first frame): take the most prominent person.
+        let prominent = mostProminent(candidates)
+        lastCentroid = Self.centroid(prominent)
+        return Selection(pose: prominent, isContinuation: false)
+    }
+
+    /// Locks tracking to whoever is nearest `centroid` (a normalized image
+    /// point, e.g. mapped from a long-press). Subsequent frames follow only
+    /// that person until unpinned or reset.
+    mutating func pin(to centroid: CGPoint) {
+        lastCentroid = centroid
+        isPinned = true
+    }
+
+    /// Returns to automatic tracking, keeping the current lock as the
+    /// starting point so the skeleton doesn't jump on release.
+    mutating func unpin() {
+        isPinned = false
     }
 
     mutating func reset() {
         lastCentroid = nil
+        isPinned = false
     }
 
     /// Most clearly-visible candidate: most joints, ties broken by mean

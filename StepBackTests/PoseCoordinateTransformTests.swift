@@ -120,4 +120,104 @@ final class PoseCoordinateTransformTests: XCTestCase {
         XCTAssertEqual(result.x, 200, accuracy: accuracy)
         XCTAssertEqual(result.y, 200, accuracy: accuracy)
     }
+
+    // MARK: - unzoomedFraction
+
+    func testUnzoomedFractionWithoutZoomIsLocationOverSize() {
+        let f = PoseCoordinateTransform.unzoomedFraction(
+            location: CGPoint(x: 100, y: 200),
+            containerSize: CGSize(width: 400, height: 400),
+            scale: 1,
+            offset: .zero
+        )
+        XCTAssertEqual(f.x, 0.25, accuracy: accuracy)
+        XCTAssertEqual(f.y, 0.5, accuracy: accuracy)
+    }
+
+    func testUnzoomedFractionUndoesCenterScale() {
+        // At 2× zoom about center, a tap at the exact center still maps to
+        // the content center (0.5, 0.5).
+        let f = PoseCoordinateTransform.unzoomedFraction(
+            location: CGPoint(x: 200, y: 200),
+            containerSize: CGSize(width: 400, height: 400),
+            scale: 2,
+            offset: .zero
+        )
+        XCTAssertEqual(f.x, 0.5, accuracy: accuracy)
+        XCTAssertEqual(f.y, 0.5, accuracy: accuracy)
+    }
+
+    func testUnzoomedFractionUndoesOffset() {
+        // Pan the content right by 50; a tap at center now corresponds to a
+        // content point left of center.
+        let f = PoseCoordinateTransform.unzoomedFraction(
+            location: CGPoint(x: 200, y: 200),
+            containerSize: CGSize(width: 400, height: 400),
+            scale: 1,
+            offset: CGSize(width: 50, height: 0)
+        )
+        XCTAssertEqual(f.x, (200.0 - 50.0) / 400.0, accuracy: accuracy)  // 0.375
+        XCTAssertEqual(f.y, 0.5, accuracy: accuracy)
+    }
+
+    func testUnzoomedFractionZeroContainerIsZero() {
+        let f = PoseCoordinateTransform.unzoomedFraction(
+            location: CGPoint(x: 10, y: 10),
+            containerSize: .zero,
+            scale: 1,
+            offset: .zero
+        )
+        XCTAssertEqual(f, .zero)
+    }
+
+    // MARK: - normalizedImagePoint (inverse of viewPoint)
+
+    func testNormalizedImagePointRoundTripsViewPoint() {
+        // viewPoint maps image → unit container fraction; the inverse should
+        // recover the original image point.
+        let imageSize = CGSize(width: 1600, height: 900)
+        let unitRect = PoseCoordinateTransform.displayRect(
+            imageSize: imageSize,
+            in: CGSize(width: 1, height: 1)
+        )
+        let original = CGPoint(x: 0.3, y: 0.7)
+        let fraction = PoseCoordinateTransform.viewPoint(
+            normalizedImagePoint: original,
+            displayRect: unitRect
+        )
+        let recovered = PoseCoordinateTransform.normalizedImagePoint(
+            containerFraction: fraction,
+            unitDisplayRect: unitRect,
+            mirrored: false
+        )
+        XCTAssertEqual(recovered?.x ?? -1, original.x, accuracy: accuracy)
+        XCTAssertEqual(recovered?.y ?? -1, original.y, accuracy: accuracy)
+    }
+
+    func testNormalizedImagePointMirrorsX() {
+        let unitRect = CGRect(x: 0, y: 0, width: 1, height: 1)  // square in square
+        let recovered = PoseCoordinateTransform.normalizedImagePoint(
+            containerFraction: CGPoint(x: 0.2, y: 0.5),
+            unitDisplayRect: unitRect,
+            mirrored: true
+        )
+        // A touch at container-left (0.2) on a mirrored video is image-right.
+        XCTAssertEqual(recovered?.x ?? -1, 0.8, accuracy: accuracy)
+        XCTAssertEqual(recovered?.y ?? -1, 0.5, accuracy: accuracy)
+    }
+
+    func testNormalizedImagePointNilOutsideLetterbox() {
+        // 16:9 in unit square letterboxes top/bottom (rect.minY≈0.219). A
+        // touch up at y=0.05 is in the black bar → nil.
+        let unitRect = PoseCoordinateTransform.displayRect(
+            imageSize: CGSize(width: 1600, height: 900),
+            in: CGSize(width: 1, height: 1)
+        )
+        let recovered = PoseCoordinateTransform.normalizedImagePoint(
+            containerFraction: CGPoint(x: 0.5, y: 0.05),
+            unitDisplayRect: unitRect,
+            mirrored: false
+        )
+        XCTAssertNil(recovered)
+    }
 }
