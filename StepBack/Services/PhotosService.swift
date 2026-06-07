@@ -1,8 +1,26 @@
 import AVFoundation
 import CoreMedia
 import Foundation
+import os
 import Photos
 import UIKit
+
+/// One-shot gate: runs the supplied closure only on its first invocation,
+/// no-ops thereafter, safely across threads. Used to resume a
+/// `CheckedContinuation` exactly once when the underlying callback can fire
+/// more than once. Resuming a continuation twice is a hard crash.
+final class ResumeOnce: @unchecked Sendable {
+    private let claimed = OSAllocatedUnfairLock(initialState: false)
+
+    func run(_ body: () -> Void) {
+        let isFirst = claimed.withLock { alreadyClaimed -> Bool in
+            if alreadyClaimed { return false }
+            alreadyClaimed = true
+            return true
+        }
+        if isFirst { body() }
+    }
+}
 
 enum PhotosError: Error, Equatable {
     case authorizationDenied
@@ -61,17 +79,22 @@ final class PhotosService: PhotosServicing, @unchecked Sendable {
         options.isNetworkAccessAllowed = true
         options.version = .current
 
+        // `requestAVAsset` can invoke its result handler more than once
+        // (progressive / iCloud delivery, or a cancel followed by a result).
+        // A CheckedContinuation must resume exactly once or it traps, so gate
+        // every path through a one-shot guard.
+        let resume = ResumeOnce()
         return try await withCheckedThrowingContinuation { continuation in
             imageManager.requestAVAsset(forVideo: phAsset, options: options) { avAsset, _, info in
                 if let error = info?[PHImageErrorKey] as? Error {
-                    continuation.resume(throwing: error)
+                    resume.run { continuation.resume(throwing: error) }
                     return
                 }
                 guard let urlAsset = avAsset as? AVURLAsset else {
-                    continuation.resume(throwing: PhotosError.notAVURLAsset)
+                    resume.run { continuation.resume(throwing: PhotosError.notAVURLAsset) }
                     return
                 }
-                continuation.resume(returning: urlAsset)
+                resume.run { continuation.resume(returning: urlAsset) }
             }
         }
     }
