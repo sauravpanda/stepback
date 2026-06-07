@@ -21,55 +21,82 @@ struct PoseTracker {
     }
 
     /// Max distance (normalized image units) between this frame's chosen
-    /// centroid and the previous one for them to count as the same person.
+    /// centroid and the *predicted* one for them to count as the same person.
     let gate: Double
+    /// If the second-nearest candidate is within this of the nearest (both
+    /// plausibly "you"), a pinned tracker holds instead of guessing — this
+    /// is what stops it hopping to a partner passing close.
+    let ambiguityMargin: Double
+    /// How much of the last frame's motion to project forward when
+    /// predicting where the tracked dancer is now. Matching against the
+    /// prediction (not the stale last position) stops a stationary passer-by
+    /// near the old spot from stealing a fast-moving lock.
+    let velocityDamping: Double
 
     private(set) var lastCentroid: CGPoint?
+    private(set) var lastVelocity: CGVector = .zero
     /// When the user has explicitly chosen a dancer, we follow *only* them:
-    /// if the pinned person isn't near `lastCentroid` this frame we hold
+    /// if the pinned person isn't near the prediction this frame we hold
     /// (return nil) and wait rather than auto-grabbing someone else. This is
     /// what stops the skeleton "randomly changing" on a crowded floor.
     private(set) var isPinned: Bool = false
 
-    init(gate: Double = 0.22) {
+    init(
+        gate: Double = 0.22,
+        ambiguityMargin: Double = 0.05,
+        velocityDamping: Double = 0.6
+    ) {
         self.gate = gate
+        self.ambiguityMargin = ambiguityMargin
+        self.velocityDamping = velocityDamping
+    }
+
+    /// Where we expect the tracked dancer to be this frame: last position
+    /// plus a damped projection of the last motion.
+    var predictedCentroid: CGPoint? {
+        guard let last = lastCentroid else { return nil }
+        return CGPoint(
+            x: last.x + velocityDamping * lastVelocity.dx,
+            y: last.y + velocityDamping * lastVelocity.dy
+        )
     }
 
     /// Returns the pose to display this frame, or nil if there's no person to
-    /// show. In auto mode an empty frame leaves `lastCentroid` untouched so a
-    /// brief dropout doesn't lose the lock; in pinned mode we also return nil
-    /// (and hold) when the pinned dancer isn't within `gate`.
+    /// show. In auto mode an empty frame leaves the lock untouched so a brief
+    /// dropout doesn't lose it; in pinned mode we also return nil (and hold)
+    /// when the pinned dancer isn't confidently identifiable this frame.
     mutating func select(from candidates: [DetectedPose]) -> Selection? {
         guard !candidates.isEmpty else { return nil }
 
-        if let last = lastCentroid {
-            let nearest = candidates.min(by: {
-                Self.distance(Self.centroid($0), last)
-                    < Self.distance(Self.centroid($1), last)
-            })!
-            let near = Self.distance(Self.centroid(nearest), last) <= gate
+        guard let predicted = predictedCentroid else {
+            // No lock yet (auto, first frame): take the most prominent person.
+            return adopt(mostProminent(candidates), isContinuation: false)
+        }
 
-            if near {
-                lastCentroid = Self.centroid(nearest)
-                return Selection(pose: nearest, isContinuation: true)
-            }
+        let ranked = candidates
+            .map { ($0, Self.distance(Self.centroid($0), predicted)) }
+            .sorted { $0.1 < $1.1 }
+        let (best, bestDist) = ranked[0]
+
+        if bestDist > gate {
             if isPinned {
-                // Pinned dancer not in range — hold and keep waiting for them.
-                // Don't move lastCentroid; they may return near the same spot,
-                // or the user can re-pin someone else.
+                // Pinned dancer not where we expect — hold and wait. Don't
+                // move the lock; they may return near the same spot.
                 return nil
             }
             // Auto mode: the tracked person left — re-anchor to the most
             // prominent candidate.
-            let prominent = mostProminent(candidates)
-            lastCentroid = Self.centroid(prominent)
-            return Selection(pose: prominent, isContinuation: false)
+            return adopt(mostProminent(candidates), isContinuation: false)
         }
 
-        // No lock yet (auto, first frame): take the most prominent person.
-        let prominent = mostProminent(candidates)
-        lastCentroid = Self.centroid(prominent)
-        return Selection(pose: prominent, isContinuation: false)
+        // A rival is almost as close as the best match. When pinned, refuse
+        // to guess — hold so we don't hop to whoever's passing. (Auto mode
+        // doesn't hold; momentary wrong picks there self-correct next frame.)
+        if isPinned, ranked.count >= 2, ranked[1].1 - bestDist < ambiguityMargin {
+            return nil
+        }
+
+        return adopt(best, isContinuation: true)
     }
 
     /// Locks tracking to whoever is nearest `centroid` (a normalized image
@@ -77,6 +104,7 @@ struct PoseTracker {
     /// that person until unpinned or reset.
     mutating func pin(to centroid: CGPoint) {
         lastCentroid = centroid
+        lastVelocity = .zero
         isPinned = true
     }
 
@@ -88,7 +116,21 @@ struct PoseTracker {
 
     mutating func reset() {
         lastCentroid = nil
+        lastVelocity = .zero
         isPinned = false
+    }
+
+    /// Commits to `pose`, updating the lock position and the velocity
+    /// estimate (the step from the previous lock to this one).
+    private mutating func adopt(_ pose: DetectedPose, isContinuation: Bool) -> Selection {
+        let c = Self.centroid(pose)
+        if isContinuation, let last = lastCentroid {
+            lastVelocity = CGVector(dx: c.x - last.x, dy: c.y - last.y)
+        } else {
+            lastVelocity = .zero
+        }
+        lastCentroid = c
+        return Selection(pose: pose, isContinuation: isContinuation)
     }
 
     /// Most clearly-visible candidate: most joints, ties broken by mean

@@ -32,6 +32,10 @@ struct PoseOverlay: View {
     /// Seconds since the last successful detection. The coordinator caps
     /// this at `staleAfter` (0.5s) before clearing `pose`.
     var poseAge: TimeInterval = 0
+    /// All detected people this frame. When non-empty, a debug layer rings
+    /// each one's centroid so the user can see which bodies the tracker was
+    /// choosing between (and which it locked onto). Empty = debug off.
+    var debugCandidates: [DetectedPose] = []
 
     /// Fade ramp parameters. Below `fadeStart` the skeleton is fully solid
     /// — every fresh detection looks the same. Past it we ramp linearly to
@@ -42,17 +46,26 @@ struct PoseOverlay: View {
 
     var body: some View {
         GeometryReader { geo in
-            if let pose, let imageSize {
+            if let imageSize {
                 let rect = PoseCoordinateTransform.displayRect(
                     imageSize: imageSize,
                     in: geo.size
                 )
-                Canvas { context, _ in
-                    drawBones(pose: pose, displayRect: rect, context: context)
-                    drawJoints(pose: pose, displayRect: rect, context: context)
-                    drawCenterOfMass(pose: pose, displayRect: rect, context: context)
+                ZStack {
+                    if let pose {
+                        Canvas { context, _ in
+                            drawBones(pose: pose, displayRect: rect, context: context)
+                            drawJoints(pose: pose, displayRect: rect, context: context)
+                            drawCenterOfMass(pose: pose, displayRect: rect, context: context)
+                        }
+                        .opacity(freshnessOpacity)
+                    }
+                    if !debugCandidates.isEmpty {
+                        Canvas { context, _ in
+                            drawDebugCandidates(displayRect: rect, context: context)
+                        }
+                    }
                 }
-                .opacity(freshnessOpacity)
             }
         }
         .allowsHitTesting(false)
@@ -211,6 +224,36 @@ struct PoseOverlay: View {
             tick.move(to: CGPoint(x: ankle.x - 10, y: ankle.y))
             tick.addLine(to: CGPoint(x: ankle.x + 10, y: ankle.y))
             context.stroke(tick, with: .color(tint.opacity(0.8)), lineWidth: 2)
+        }
+    }
+
+    /// Debug layer: rings every detected person's centroid and labels it
+    /// with its joint count, so a screen recording shows which bodies the
+    /// tracker chose between. The currently-tracked person also has the full
+    /// coloured skeleton drawn over their ring.
+    private func drawDebugCandidates(
+        displayRect: CGRect,
+        context: GraphicsContext
+    ) {
+        for (index, candidate) in debugCandidates.enumerated() {
+            let c = PoseTracker.centroid(candidate)
+            let p = PoseCoordinateTransform.viewPoint(
+                normalizedImagePoint: c,
+                displayRect: displayRect
+            )
+            let r: CGFloat = 14
+            let ring = CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)
+            context.stroke(
+                Path(ellipseIn: ring),
+                with: .color(.cyan.opacity(0.9)),
+                lineWidth: 2
+            )
+            context.draw(
+                Text("\(index): \(candidate.joints.count)j")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.cyan),
+                at: CGPoint(x: p.x, y: p.y - r - 8)
+            )
         }
     }
 
