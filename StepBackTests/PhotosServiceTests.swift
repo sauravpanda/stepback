@@ -1,4 +1,5 @@
 import AVFoundation
+import os
 import Photos
 @testable import StepBack
 import XCTest
@@ -32,5 +33,28 @@ final class PhotosServiceTests: XCTestCase {
             .notDetermined, .restricted, .denied, .authorized, .limited
         ]
         XCTAssertTrue(valid.contains(status))
+    }
+
+    // MARK: - ResumeOnce (the #53 double-resume guard)
+
+    func testResumeOnceRunsBodyExactlyOnce() {
+        let guardOnce = ResumeOnce()
+        var count = 0
+        guardOnce.run { count += 1 }
+        guardOnce.run { count += 1 }
+        guardOnce.run { count += 1 }
+        XCTAssertEqual(count, 1, "only the first call should run")
+    }
+
+    func testResumeOnceIsThreadSafeUnderConcurrency() {
+        // Hammer it from many threads at once; exactly one body must run —
+        // this is the property that prevents the continuation double-resume.
+        let guardOnce = ResumeOnce()
+        let counter = OSAllocatedUnfairLock(initialState: 0)
+        let iterations = 1_000
+        DispatchQueue.concurrentPerform(iterations: iterations) { _ in
+            guardOnce.run { counter.withLock { $0 += 1 } }
+        }
+        XCTAssertEqual(counter.withLock { $0 }, 1, "exactly one body across \(iterations) racing calls")
     }
 }
