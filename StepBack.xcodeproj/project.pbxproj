@@ -38,6 +38,7 @@
 		A49A15759EECD46EC5E3A694 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D07843122196F5F0DA539D1 /* Theme.swift */; };
 		A88000A1ACD9503F7A9D6143 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAB30650146433E889DC2AF4 /* LibraryView.swift */; };
 		AB9467B4E5F44BFF1AA916B1 /* TrimAnnotationShifterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB991AFC28C64366954E1D19 /* TrimAnnotationShifterTests.swift */; };
+		AC3C4E9971B4B8A97E149C08 /* PlayerSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11A013353F926EF8DDE1D2C /* PlayerSurface.swift */; };
 		AD47C4CE36AF1FD4FF011BCC /* SegmentThumbnailGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94AAA488969D7CF77497859D /* SegmentThumbnailGenerator.swift */; };
 		B3A98425CA93181D0723AB60 /* AutoTagServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C54B956DF5DE01C00D95680 /* AutoTagServiceTests.swift */; };
 		B6CB4CFDF1EB16757B0D78AA /* CompareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D24FDCCE45AEFB352C5EBF /* CompareView.swift */; };
@@ -125,6 +126,7 @@
 		D8F8476EAB523378C1F1E046 /* PhotosService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosService.swift; sourceTree = "<group>"; };
 		DB3B8C1BB7ACE2D1C13C7200 /* StepTimingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepTimingTests.swift; sourceTree = "<group>"; };
 		DB3B9912F4A07E233D008D07 /* PoseTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoseTracker.swift; sourceTree = "<group>"; };
+		E11A013353F926EF8DDE1D2C /* PlayerSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSurface.swift; sourceTree = "<group>"; };
 		E56B6CE778D3BD0C5B1B248B /* KeepScreenAwake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepScreenAwake.swift; sourceTree = "<group>"; };
 		EAF9D9B68E730BA51C86D70A /* TrimView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrimView.swift; sourceTree = "<group>"; };
 		EB991AFC28C64366954E1D19 /* TrimAnnotationShifterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrimAnnotationShifterTests.swift; sourceTree = "<group>"; };
@@ -158,6 +160,7 @@
 				8D25E6771271EDD5B867F61E /* ClipEditView.swift */,
 				92D24FDCCE45AEFB352C5EBF /* CompareView.swift */,
 				AAB30650146433E889DC2AF4 /* LibraryView.swift */,
+				E11A013353F926EF8DDE1D2C /* PlayerSurface.swift */,
 				08505D0FA11E6637197AF8EC /* PoseOverlay.swift */,
 				CC6BAE20433D2ED45F00AD41 /* PracticeBeatUI.swift */,
 				C35987D9825155E131A40950 /* PracticeControls.swift */,
@@ -361,6 +364,7 @@
 				ED3E826645A88F1EA36A182D /* OneEuroFilter.swift in Sources */,
 				D8739042EECB4AE2C7804C41 /* OriginalImportService.swift in Sources */,
 				F7AD3FACE8B875F1C9DFA310 /* PhotosService.swift in Sources */,
+				AC3C4E9971B4B8A97E149C08 /* PlayerSurface.swift in Sources */,
 				782B609F039BD291571F9CB2 /* PoseCoordinateTransform.swift in Sources */,
 				6BEA9ED6D92F4B26B85BFA21 /* PoseDetectionService.swift in Sources */,
 				BF68180962319C57EBD42BA8 /* PoseOrientation.swift in Sources */,

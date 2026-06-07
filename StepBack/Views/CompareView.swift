@@ -18,16 +18,20 @@ struct CompareView: View {
     init(primary: DanceClip, secondary: DanceClip) {
         self.primaryClip = primary
         self.secondaryClip = secondary
+        // Prefer the sandboxed local file (trim > original) so compare keeps
+        // working after the user deletes the source from Photos — matching
+        // PracticeView. `trimmedFileURL` alone left untrimmed clips falling
+        // back to a PHAsset round-trip (or failing outright if it was gone).
         _primary = StateObject(
             wrappedValue: PracticePlayerViewModel(
                 assetIdentifier: primary.assetIdentifier,
-                localFileURL: primary.trimmedFileURL
+                localFileURL: primary.preferredLocalFileURL
             )
         )
         _secondary = StateObject(
             wrappedValue: PracticePlayerViewModel(
                 assetIdentifier: secondary.assetIdentifier,
-                localFileURL: secondary.trimmedFileURL
+                localFileURL: secondary.preferredLocalFileURL
             )
         )
     }
@@ -80,9 +84,13 @@ struct CompareView: View {
     ) -> some View {
         VStack(spacing: 6) {
             ZStack(alignment: .topTrailing) {
-                ComparePlayerSurface(player: viewModel.player)
+                // Fill the panel and let AVPlayerLayer.resizeAspect letterbox
+                // once. The old .aspectRatio(16/9) forced a 16:9 box that the
+                // layer then letterboxed *inside* — double-letterboxing any
+                // non-16:9 clip (same bug fixed in PracticeView, #67).
+                PlayerSurface(player: viewModel.player)
                     .scaleEffect(x: mirrored.wrappedValue ? -1 : 1, y: 1)
-                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.black)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 Button {
@@ -163,34 +171,6 @@ struct CompareView: View {
         speed = newSpeed
         primary.setSpeed(newSpeed)
         secondary.setSpeed(newSpeed)
-    }
-}
-
-// MARK: - Internal player surface (duplicated to keep PracticeView's private)
-
-private struct ComparePlayerSurface: UIViewRepresentable {
-    let player: AVPlayer
-
-    func makeUIView(context: Context) -> CompareLayerView {
-        let view = CompareLayerView()
-        view.playerLayer.player = player
-        view.playerLayer.videoGravity = .resizeAspect
-        return view
-    }
-
-    func updateUIView(_ uiView: CompareLayerView, context: Context) {
-        uiView.playerLayer.player = player
-    }
-}
-
-private final class CompareLayerView: UIView {
-    override static var layerClass: AnyClass { AVPlayerLayer.self }
-
-    var playerLayer: AVPlayerLayer {
-        guard let layer = layer as? AVPlayerLayer else {
-            preconditionFailure("CompareLayerView.layer must be an AVPlayerLayer")
-        }
-        return layer
     }
 }
 

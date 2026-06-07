@@ -95,7 +95,7 @@ struct TrimView: View {
     }
 
     private var videoPanel: some View {
-        TrimPlayerSurface(player: player)
+        PlayerSurface(player: player)
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .background(Color.black)
             .overlay(alignment: .bottom) {
@@ -298,34 +298,6 @@ struct TrimView: View {
         }
 
         try? modelContext.save()
-    }
-}
-
-// MARK: - Player surface
-
-private struct TrimPlayerSurface: UIViewRepresentable {
-    let player: AVPlayer
-
-    func makeUIView(context: Context) -> TrimPlayerView {
-        let view = TrimPlayerView()
-        view.playerLayer.player = player
-        view.playerLayer.videoGravity = .resizeAspect
-        return view
-    }
-
-    func updateUIView(_ uiView: TrimPlayerView, context: Context) {
-        uiView.playerLayer.player = player
-    }
-}
-
-private final class TrimPlayerView: UIView {
-    override static var layerClass: AnyClass { AVPlayerLayer.self }
-
-    var playerLayer: AVPlayerLayer {
-        guard let layer = layer as? AVPlayerLayer else {
-            preconditionFailure("TrimPlayerView.layer must be an AVPlayerLayer")
-        }
-        return layer
     }
 }
 
