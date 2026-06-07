@@ -20,6 +20,9 @@ struct PracticeView: View {
     /// Single-tap on the video remains wired to play/pause so pausing
     /// doesn't require bringing controls back first.
     @State private var controlsHidden: Bool = false
+    /// Debug: ring every detected person so hops are diagnosable from a
+    /// screen recording.
+    @State private var poseDebug: Bool = false
     @StateObject private var poseCoordinator: PoseStreamCoordinator
 
     init(clip: DanceClip) {
@@ -218,7 +221,8 @@ struct PracticeView: View {
                             PoseOverlay(
                                 pose: poseCoordinator.pose,
                                 imageSize: poseCoordinator.imageSize,
-                                poseAge: poseCoordinator.poseAge
+                                poseAge: poseCoordinator.poseAge,
+                                debugCandidates: poseDebug ? poseCoordinator.candidates : []
                             )
                             .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
                         }
@@ -232,6 +236,7 @@ struct PracticeView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             PoseStatusChip(status: poseCoordinator.status)
                             poseTrackingControl
+                            poseDebugToggle
                         }
                         .padding(.leading, 10)
                         .padding(.top, 10)
@@ -291,6 +296,26 @@ struct PracticeView: View {
             .padding(.vertical, 4)
             .background(Color.black.opacity(0.55), in: Capsule())
         }
+    }
+
+    /// Small debug toggle: rings every detected person so a screen recording
+    /// shows which body the tracker locked onto and which it skipped.
+    private var poseDebugToggle: some View {
+        Button {
+            poseDebug.toggle()
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: poseDebug ? "ladybug.fill" : "ladybug")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(poseDebug ? "Debug on" : "Debug")
+                    .font(.system(.caption2, design: .rounded, weight: .semibold))
+            }
+            .foregroundStyle(poseDebug ? .cyan : Theme.Color.textSecondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.black.opacity(0.55), in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     /// Maps a long-press location (as a fraction of the un-zoomed player

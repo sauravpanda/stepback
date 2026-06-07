@@ -30,6 +30,10 @@ final class PoseStreamCoordinator: ObservableObject {
     /// True when the user has long-pressed a specific dancer to follow. The
     /// view surfaces this (lock badge + Release control).
     @Published private(set) var isPinned: Bool = false
+    /// Every person detected in the latest processed frame (not just the
+    /// tracked one). Published for the optional debug overlay so the user
+    /// can see which bodies the tracker was choosing between.
+    @Published private(set) var candidates: [DetectedPose] = []
     /// Seconds since the most recent *successful* detection. Used by the
     /// overlay to fade the skeleton from solid (fresh) to transparent
     /// (about-to-be-cleared) so the dashboard can see when we're holding a
@@ -103,6 +107,7 @@ final class PoseStreamCoordinator: ObservableObject {
         smoother.reset()
         tracker.reset()
         isPinned = false
+        candidates = []
         attachOutputIfNeeded()
         tickTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -124,6 +129,7 @@ final class PoseStreamCoordinator: ObservableObject {
         smoother.reset()
         tracker.reset()
         isPinned = false
+        candidates = []
         detachOutput()
     }
 
@@ -252,6 +258,8 @@ final class PoseStreamCoordinator: ObservableObject {
         let result = await detect(pixelBuffer: pixelBuffer, orientation: orientation)
         switch result {
         case .success(let candidates):
+            // Publish all candidates for the debug overlay before selection.
+            self.candidates = candidates
             // Lock onto one person across frames. Returns nil only when the
             // frame had no candidates at all.
             if let selection = tracker.select(from: candidates) {

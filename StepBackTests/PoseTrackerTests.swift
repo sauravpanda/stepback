@@ -143,6 +143,52 @@ final class PoseTrackerTests: XCTestCase {
         XCTAssertNil(tracker.lastCentroid)
     }
 
+    // MARK: - Prediction & ambiguity
+
+    func testPredictionFollowsMovingDancerOverStationaryRival() {
+        var tracker = PoseTracker(gate: 0.22, ambiguityMargin: 0.05, velocityDamping: 0.6)
+        // Build up a consistent rightward motion: 0.30 → 0.40.
+        _ = tracker.select(from: [pose(at: CGPoint(x: 0.30, y: 0.5), count: 5)])
+        _ = tracker.select(from: [pose(at: CGPoint(x: 0.40, y: 0.5), count: 5)])
+        // Velocity is +0.10. Predicted ≈ 0.40 + 0.6*0.10 = 0.46.
+        // Now the dancer is at 0.50; a stationary rival sits at 0.36 (near the
+        // OLD position). Naive nearest-to-last (0.40) would grab 0.36; the
+        // prediction should keep us on 0.50.
+        let dancer = pose(at: CGPoint(x: 0.50, y: 0.5), count: 5)
+        let rival = pose(at: CGPoint(x: 0.36, y: 0.5), count: 5)
+        let sel = tracker.select(from: [rival, dancer])
+        XCTAssertEqual(sel?.pose, dancer, "prediction should keep the fast-moving dancer")
+    }
+
+    func testPinnedHoldsWhenTwoCandidatesAreEquallyClose() {
+        var tracker = PoseTracker(gate: 0.22, ambiguityMargin: 0.05)
+        tracker.pin(to: CGPoint(x: 0.50, y: 0.5))
+        // Two candidates straddle the pinned point at equal distance (0.03)
+        // — a partner overlapping during a pass. Refuse to guess → hold.
+        let a = pose(at: CGPoint(x: 0.47, y: 0.5), count: 5)
+        let b = pose(at: CGPoint(x: 0.53, y: 0.5), count: 5)
+        XCTAssertNil(tracker.select(from: [a, b]), "ambiguous frame should hold, not hop")
+    }
+
+    func testPinnedAcceptsWhenOneCandidateIsClearlyClosest() {
+        var tracker = PoseTracker(gate: 0.22, ambiguityMargin: 0.05)
+        tracker.pin(to: CGPoint(x: 0.50, y: 0.5))
+        // One right on the pin, the rival well outside the margin.
+        let onPin = pose(at: CGPoint(x: 0.50, y: 0.5), count: 5)
+        let rival = pose(at: CGPoint(x: 0.70, y: 0.5), count: 5)
+        let sel = tracker.select(from: [rival, onPin])
+        XCTAssertEqual(sel?.pose, onPin)
+    }
+
+    func testPinResetsVelocity() {
+        var tracker = PoseTracker()
+        _ = tracker.select(from: [pose(at: CGPoint(x: 0.2, y: 0.5))])
+        _ = tracker.select(from: [pose(at: CGPoint(x: 0.4, y: 0.5))])  // velocity +0.2
+        tracker.pin(to: CGPoint(x: 0.8, y: 0.5))
+        XCTAssertEqual(tracker.lastVelocity.dx, 0, accuracy: 1e-9)
+        XCTAssertEqual(tracker.lastVelocity.dy, 0, accuracy: 1e-9)
+    }
+
     // MARK: - Centroid
 
     func testCentroidIsAverageOfJoints() {
