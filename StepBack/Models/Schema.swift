@@ -11,10 +11,10 @@ import SwiftData
 /// sync, on-disk thumbnails, new `ClipSegment` fields, etc.), it ships as a
 /// V2 with an explicit `MigrationStage` between V1 and V2.
 ///
-/// To add V2: copy this enum to `SchemaV2`, declare V2's `models`, then
-/// append a stage in `StepBackMigrationPlan.stages` describing the V1→V2
-/// transition (lightweight if additive-only, custom for renames or data
-/// transformations).
+/// Authoring V2 correctly requires *frozen copies* of every model as it
+/// existed at V1 (nested in this enum), not a second schema pointing at the
+/// same live classes — SwiftData rejects two versioned schemas that share
+/// model types with a "checksum while model is still editable" error.
 enum SchemaV1: VersionedSchema {
     static let versionIdentifier: Schema.Version = .init(1, 0, 0)
 

@@ -22,6 +22,28 @@ final class TrimAnnotationShifterTests: XCTestCase {
         XCTAssertEqual(TrimAnnotationShifter.shiftPoint(12, trimStart: 5, trimEnd: 12), 7)
     }
 
+    // MARK: - Widening (negative trimStart)
+
+    // When a re-trim *widens* the window, the trim range expressed in the
+    // current timeline has a negative start. Annotations should shift forward
+    // (we added time before them), not drop. This is the property the
+    // re-editable trim depends on.
+
+    func testShiftPointWithNegativeTrimStartShiftsForward() {
+        // Widened by 3s in front: a point at current-time 4 moves to 7.
+        XCTAssertEqual(
+            TrimAnnotationShifter.shiftPoint(4, trimStart: -3, trimEnd: 17),
+            7
+        )
+    }
+
+    func testShiftRangeWithNegativeTrimStartShiftsForward() {
+        let result = TrimAnnotationShifter.shiftRange(
+            start: 2, end: 10, trimStart: -3, trimEnd: 17
+        )
+        XCTAssertEqual(result, .init(start: 5, end: 13))
+    }
+
     // MARK: - Ranges
 
     func testShiftRangeFullyInsideRebasesWithoutClamping() {
