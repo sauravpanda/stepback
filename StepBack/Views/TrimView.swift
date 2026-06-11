@@ -4,37 +4,48 @@ import SwiftData
 import SwiftUI
 import UIKit
 
-/// Modal trim editor. Shares the parent practice screen's `AVPlayer` so we
-/// don't double the in-memory video buffers — long clips on a phone will
-/// blow past the per-process limit fast if two players are decoding the
-/// same source.
+/// Modal trim editor. Loads the clip's *original* asset (not the parent's
+/// trimmed player), so a trim can be widened as well as narrowed and never
+/// degrades quality by trimming an already-trimmed file. The parent frees
+/// its decoder while this is open so we don't double the in-memory buffers.
 ///
-/// Picks a [start, end] window with two handles, then exports the range
-/// to the sandbox and rebases all annotations on the new timeline.
+/// Picks a [start, end] window with two handles, exports that range from the
+/// original, and rebases all annotations onto the new timeline. The kept
+/// window is recorded in the trim filename so the next edit can re-source
+/// from the original.
 struct TrimView: View {
 
     let clip: DanceClip
-    let player: AVPlayer
-    let initialDuration: Double
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    @State private var duration: Double
+    private let photosService: PhotosServicing
+
+    @State private var player = AVPlayer()
+    @State private var sourceAsset: AVURLAsset?
+    /// Offset (seconds) from the current annotation timeline to the source
+    /// asset's timeline. >0 when re-trimming a clip whose existing trim began
+    /// `sourceOffset` into the original; 0 for a first trim or the fallback.
+    @State private var sourceOffset: Double = 0
+    /// True when trimming the full original (handles can widen); false when
+    /// we fell back to the already-trimmed file (narrow only).
+    @State private var sourceIsOriginal = false
+
+    @State private var duration: Double = 0
     @State private var currentTime: Double = 0
     @State private var isPlaying: Bool = false
     @State private var trimStart: Double = 0
-    @State private var trimEnd: Double
+    @State private var trimEnd: Double = 0
+    @State private var isReady = false
+    @State private var loadError: String?
     @State private var isExporting = false
     @State private var exportError: String?
     @State private var timeObserver: Any?
 
-    init(clip: DanceClip, player: AVPlayer, initialDuration: Double) {
+    init(clip: DanceClip, photosService: PhotosServicing = PhotosService()) {
         self.clip = clip
-        self.player = player
-        self.initialDuration = initialDuration
-        _duration = State(initialValue: initialDuration)
-        _trimEnd = State(initialValue: initialDuration)
+        self.photosService = photosService
     }
 
     var body: some View {
@@ -58,10 +69,7 @@ struct TrimView: View {
                 }
             }
         }
-        .onAppear {
-            seek(to: 0)
-            attachTimeObserver()
-        }
+        .task { await loadSource() }
         .onDisappear { detachTimeObserver() }
         .keepScreenAwake()
         .preferredColorScheme(.dark)
@@ -69,29 +77,48 @@ struct TrimView: View {
 
     // MARK: - Content
 
+    @ViewBuilder
     private var content: some View {
-        VStack(spacing: 16) {
-            videoPanel
-            handles
-            preset
-            if let exportError {
-                Text(exportError)
+        if let loadError {
+            VStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 36, weight: .light))
+                    .foregroundStyle(Theme.Color.accent)
+                Text("Couldn't open this clip to trim")
+                    .font(Theme.Font.bodyEmphasized)
+                    .foregroundStyle(Theme.Color.textPrimary)
+                Text(loadError)
                     .font(Theme.Font.caption)
-                    .foregroundStyle(.red.opacity(0.9))
+                    .foregroundStyle(Theme.Color.textSecondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 24)
             }
-            if isExporting {
-                HStack(spacing: 8) {
-                    ProgressView().tint(Theme.Color.accent)
-                    Text("Exporting…")
+        } else if !isReady {
+            ProgressView().tint(Theme.Color.accent)
+        } else {
+            VStack(spacing: 16) {
+                videoPanel
+                handles
+                preset
+                if let exportError {
+                    Text(exportError)
                         .font(Theme.Font.caption)
-                        .foregroundStyle(Theme.Color.textSecondary)
+                        .foregroundStyle(.red.opacity(0.9))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 16)
                 }
+                if isExporting {
+                    HStack(spacing: 8) {
+                        ProgressView().tint(Theme.Color.accent)
+                        Text("Exporting…")
+                            .font(Theme.Font.caption)
+                            .foregroundStyle(Theme.Color.textSecondary)
+                    }
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            .padding(.top, 8)
         }
-        .padding(.top, 8)
     }
 
     private var videoPanel: some View {
@@ -165,10 +192,12 @@ struct TrimView: View {
 
     private var preset: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Heads up")
+            Text(sourceIsOriginal ? "Re-editable trim" : "Heads up")
                 .font(.system(.footnote, design: .rounded, weight: .semibold))
                 .foregroundStyle(Theme.Color.textSecondary)
-            Text("Trimming replaces the clip's source with a new file. Patterns and beat times are kept and shifted to the new timeline; anything outside the kept window is dropped.")
+            Text(sourceIsOriginal
+                ? "Trim is re-exported from your original video, so you can widen or narrow it later. Patterns and beat times are shifted to the new window; any that fall outside it are dropped."
+                : "Trimming replaces the clip's source with a new file. Patterns and beat times are shifted to the new window; anything outside it is dropped.")
                 .font(Theme.Font.caption)
                 .foregroundStyle(Theme.Color.textTertiary)
         }
@@ -235,16 +264,83 @@ struct TrimView: View {
         player.pause()
     }
 
+    // MARK: - Loading the source
+
+    private func loadSource() async {
+        do {
+            let resolved = try await resolveTrimSource()
+            let loaded = (try? await resolved.asset.load(.duration).seconds) ?? 0
+            guard loaded.isFinite, loaded > 0 else {
+                loadError = "Couldn't read the clip's length."
+                return
+            }
+            sourceAsset = resolved.asset
+            sourceOffset = resolved.offset
+            sourceIsOriginal = resolved.isOriginal
+            duration = loaded
+
+            // Open showing the current trim window when we can map it onto the
+            // source (re-editing from the original); otherwise the whole source.
+            if resolved.isOriginal,
+               let name = clip.trimmedFileName,
+               let bounds = TrimStorage.bounds(fromName: name) {
+                trimStart = max(0, min(bounds.start, loaded))
+                trimEnd = max(trimStart + 0.05, min(bounds.end, loaded))
+            } else {
+                trimStart = 0
+                trimEnd = loaded
+            }
+
+            let item = AVPlayerItem(asset: resolved.asset)
+            item.audioTimePitchAlgorithm = .timeDomain
+            player.replaceCurrentItem(with: item)
+            isReady = true
+            seek(to: trimStart)
+            attachTimeObserver()
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    /// Decides what to trim from and how the current annotation timeline maps
+    /// onto it. Prefers the full original (so the trim can widen) whenever the
+    /// offset is known — i.e. the clip was never trimmed, or its trim filename
+    /// records its source range. Falls back to the already-trimmed file
+    /// (narrow only) for legacy trims or when the original is gone.
+    private func resolveTrimSource() async throws
+        -> (asset: AVURLAsset, offset: Double, isOriginal: Bool) {
+        let parsedStart = clip.trimmedFileName
+            .flatMap { TrimStorage.bounds(fromName: $0)?.start }
+        let offsetKnown = clip.trimmedFileName == nil || parsedStart != nil
+
+        if offsetKnown {
+            if let url = clip.originalFileURL {
+                return (AVURLAsset(url: url), parsedStart ?? 0, true)
+            }
+            if let urlAsset = try? await photosService.resolveAVAsset(for: clip.assetIdentifier) {
+                return (urlAsset, parsedStart ?? 0, true)
+            }
+        }
+
+        // Fallback: trim the current playable file. Annotations already align
+        // with it (offset 0), but we can only narrow.
+        if let url = clip.preferredLocalFileURL {
+            return (AVURLAsset(url: url), 0, false)
+        }
+        if let urlAsset = try? await photosService.resolveAVAsset(for: clip.assetIdentifier) {
+            return (urlAsset, 0, false)
+        }
+        throw TrimError.exportFailed("Couldn't load the clip to trim.")
+    }
+
     // MARK: - Apply
 
     private var canApply: Bool {
-        duration > 0
-            && trimEnd - trimStart > 0.05
-            && (trimStart > 0.05 || trimEnd < duration - 0.05)
+        isReady && duration > 0 && trimEnd - trimStart > 0.05
     }
 
     private func applyTrim() async {
-        guard let asset = player.currentItem?.asset else {
+        guard let asset = sourceAsset else {
             exportError = "Clip isn't ready yet."
             return
         }
@@ -256,7 +352,8 @@ struct TrimView: View {
             let result = try await TrimExportService().export(
                 asset: asset,
                 start: trimStart,
-                end: trimEnd
+                end: trimEnd,
+                recordsOriginalBounds: sourceIsOriginal
             )
             applyToModel(fileName: result.fileName, newDuration: result.durationSeconds)
             isExporting = false
@@ -274,21 +371,26 @@ struct TrimView: View {
         clip.trimmedFileName = fileName
         clip.durationSeconds = newDuration
 
-        let start = trimStart
-        let end = trimEnd
+        // Annotations live in the *current* timeline. Express the new window
+        // there too (subtract the source offset) so widening — where
+        // newStart < sourceOffset, making rebaseStart negative — shifts them
+        // forward correctly instead of dropping them.
+        let rebaseStart = trimStart - sourceOffset
+        let rebaseEnd = trimEnd - sourceOffset
+
         clip.firstDownbeatSeconds = clip.firstDownbeatSeconds.flatMap {
-            TrimAnnotationShifter.shiftPoint($0, trimStart: start, trimEnd: end)
+            TrimAnnotationShifter.shiftPoint($0, trimStart: rebaseStart, trimEnd: rebaseEnd)
         }
         clip.setBeatTimes(
-            TrimAnnotationShifter.shiftBeatTimes(clip.beatTimes, trimStart: start, trimEnd: end)
+            TrimAnnotationShifter.shiftBeatTimes(clip.beatTimes, trimStart: rebaseStart, trimEnd: rebaseEnd)
         )
 
         for segment in clip.segments {
             if let shifted = TrimAnnotationShifter.shiftRange(
                 start: segment.startSeconds,
                 end: segment.endSeconds,
-                trimStart: start,
-                trimEnd: end
+                trimStart: rebaseStart,
+                trimEnd: rebaseEnd
             ) {
                 segment.startSeconds = shifted.start
                 segment.endSeconds = shifted.end

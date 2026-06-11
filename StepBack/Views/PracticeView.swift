@@ -175,7 +175,9 @@ struct PracticeView: View {
             // of the trim sheet without exporting.
             Task { await vm.reloadAsset(localFileURL: clip.preferredLocalFileURL) }
         }) {
-            TrimView(clip: clip, player: vm.player, initialDuration: vm.duration)
+            // TrimView loads the original in its own player, so it no longer
+            // shares ours.
+            TrimView(clip: clip)
         }
         .sheet(item: $editingSegment) { segment in
             SegmentEditSheet(
@@ -499,11 +501,15 @@ struct PracticeView: View {
                 systemImage: "crop",
                 tint: .surface
             ) {
-                // Park the parent VM in a neutral state — loop bounds and
-                // segment selection would fight TrimView's own seeking
-                // since they share an AVPlayer.
+                // Free our decoder while TrimView is open — it loads the
+                // original in its own player, and two decoders of a long clip
+                // can blow the per-process memory budget. Also stop pose so it
+                // isn't polling a player whose item we just removed. The
+                // onDismiss reload restores playback.
                 vm.pause()
                 vm.clearLoop()
+                poseCoordinator.stop()
+                vm.player.replaceCurrentItem(with: nil)
                 trimSheetPresented = true
             }
             ActionPill(
