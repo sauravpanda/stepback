@@ -317,7 +317,7 @@ struct TrimView: View {
             if let url = clip.originalFileURL {
                 return (AVURLAsset(url: url), parsedStart ?? 0, true)
             }
-            if let urlAsset = try? await photosService.resolveAVAsset(for: clip.assetIdentifier) {
+            if let urlAsset = try? await resolvePhotoAsset() {
                 return (urlAsset, parsedStart ?? 0, true)
             }
         }
@@ -327,10 +327,24 @@ struct TrimView: View {
         if let url = clip.preferredLocalFileURL {
             return (AVURLAsset(url: url), 0, false)
         }
-        if let urlAsset = try? await photosService.resolveAVAsset(for: clip.assetIdentifier) {
+        if let urlAsset = try? await resolvePhotoAsset() {
             return (urlAsset, 0, false)
         }
         throw TrimError.exportFailed("Couldn't load the clip to trim.")
+    }
+
+    /// Photos resolution with cloud-identifier healing: a stale local
+    /// identifier gets re-mapped and persisted so later resolves are direct.
+    private func resolvePhotoAsset() async throws -> AVURLAsset {
+        let resolved = try await photosService.resolveAVAsset(
+            localIdentifier: clip.assetIdentifier,
+            cloudIdentifier: clip.cloudAssetIdentifier
+        )
+        if let healed = resolved.remappedLocalIdentifier {
+            clip.assetIdentifier = healed
+            try? modelContext.save()
+        }
+        return resolved.asset
     }
 
     // MARK: - Apply

@@ -1,16 +1,22 @@
 import Foundation
 import SwiftData
 
+// These live models are the V2 schema shape (see Schema.swift). CloudKit
+// sync imposes three rules on every model here: no unique constraints,
+// every attribute optional or defaulted, every relationship optional.
+// The optional relationship arrays sit behind non-optional computed
+// accessors so call sites never deal with `[ClipSegment]?`.
+
 @Model
 final class DanceClip: Equatable, Hashable {
-    var id: UUID
-    var title: String
-    var assetIdentifier: String
-    var dateAdded: Date
+    var id: UUID = UUID()
+    var title: String = ""
+    var assetIdentifier: String = ""
+    var dateAdded: Date = Date()
     var eventName: String?
-    var notes: String
+    var notes: String = ""
     var thumbnailData: Data?
-    var durationSeconds: Double
+    var durationSeconds: Double = 0
 
     // Beat analysis, populated once by BeatDetector and cached in the store.
     var bpm: Double?
@@ -25,15 +31,31 @@ final class DanceClip: Equatable, Hashable {
     var trimmedFileName: String?
 
     /// Filename (in `OriginalStorage.directory`) for a sandboxed copy of the
-    /// imported video. Set on import so segments and beat data survive the
-    /// user deleting the original from Photos. Nil for clips imported before
-    /// this field existed; those keep the legacy PHAsset-only behavior.
+    /// imported video. Only set when the "keep local copies" setting is on;
+    /// nil clips resolve through the PHAsset reference instead.
     var originalFileName: String?
 
-    @Relationship(deleteRule: .cascade, inverse: \ClipSegment.clip)
-    var segments: [ClipSegment] = []
+    /// `PHCloudIdentifier` string for the source asset. Unlike
+    /// `assetIdentifier` (a device-local `PHAsset` identifier), this one is
+    /// stable across iCloud Photo Library resyncs and app reinstalls, so a
+    /// stale local identifier can be re-mapped instead of losing the clip.
+    var cloudAssetIdentifier: String?
 
-    var tags: [Tag] = []
+    @Relationship(deleteRule: .cascade, originalName: "segments", inverse: \ClipSegment.clip)
+    var segmentsStorage: [ClipSegment]?
+
+    @Relationship(originalName: "tags")
+    var tagsStorage: [Tag]?
+
+    var segments: [ClipSegment] {
+        get { segmentsStorage ?? [] }
+        set { segmentsStorage = newValue }
+    }
+
+    var tags: [Tag] {
+        get { tagsStorage ?? [] }
+        set { tagsStorage = newValue }
+    }
 
     init(
         id: UUID = UUID(),
@@ -97,8 +119,8 @@ final class DanceClip: Equatable, Hashable {
     }
 
     /// Best local file to play back: trim if present, otherwise the
-    /// sandboxed original. Falls through to nil for legacy PHAsset-only
-    /// clips, which the caller resolves via `PhotosService`.
+    /// sandboxed original. Falls through to nil for reference-only clips,
+    /// which the caller resolves via `PhotosService`.
     var preferredLocalFileURL: URL? {
         trimmedFileURL ?? originalFileURL
     }
@@ -106,12 +128,17 @@ final class DanceClip: Equatable, Hashable {
 
 @Model
 final class Tag {
-    var id: UUID
-    var name: String
-    var colorHex: String
+    var id: UUID = UUID()
+    var name: String = ""
+    var colorHex: String = ""
 
-    @Relationship(inverse: \DanceClip.tags)
-    var clips: [DanceClip] = []
+    @Relationship(originalName: "clips", inverse: \DanceClip.tagsStorage)
+    var clipsStorage: [DanceClip]?
+
+    var clips: [DanceClip] {
+        get { clipsStorage ?? [] }
+        set { clipsStorage = newValue }
+    }
 
     init(id: UUID = UUID(), name: String, colorHex: String) {
         self.id = id
@@ -122,14 +149,14 @@ final class Tag {
 
 @Model
 final class ClipSegment: Equatable, Hashable {
-    var id: UUID
-    var title: String
-    var startSeconds: Double
-    var endSeconds: Double
-    var preferredSpeed: Double
-    var notes: String
-    var dateAdded: Date
-    var orderIndex: Int
+    var id: UUID = UUID()
+    var title: String = ""
+    var startSeconds: Double = 0
+    var endSeconds: Double = 0
+    var preferredSpeed: Double = 1.0
+    var notes: String = ""
+    var dateAdded: Date = Date()
+    var orderIndex: Int = 0
     var thumbnailData: Data?
     var clip: DanceClip?
 

@@ -20,6 +20,12 @@ struct LibraryView: View {
     @State private var selectedClipIDs: Set<UUID> = []
     @State private var bulkMovePresented: Bool = false
     @State private var deleteConfirmation: DeleteConfirmation?
+    @State private var settingsPresented: Bool = false
+
+    /// Whether import also copies the video into the app sandbox. Off by
+    /// default: clips reference the Photos asset and take no extra storage,
+    /// at the cost of dying with the Photos original. See `SettingsView`.
+    @AppStorage(SettingsKeys.keepLocalCopies) private var keepLocalCopies = false
 
     private let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
     private let photosService: PhotosServicing = PhotosService()
@@ -53,6 +59,11 @@ struct LibraryView: View {
                 }
                 .task {
                     _ = await photosService.requestAuthorization()
+                    backfillCloudIdentifiers()
+                }
+                .sheet(isPresented: $settingsPresented) {
+                    SettingsView()
+                        .preferredColorScheme(.dark)
                 }
                 .sheet(item: $editingClip) { clip in
                     ClipEditView(clip: clip)
@@ -220,12 +231,21 @@ struct LibraryView: View {
             }
         }
         ToolbarItem(placement: .topBarLeading) {
-            if case .importing(let current, let total) = importState {
-                HStack(spacing: 6) {
-                    ProgressView()
-                    Text("\(current)/\(total)")
-                        .font(Theme.Font.caption)
-                        .foregroundStyle(Theme.Color.textSecondary)
+            HStack(spacing: 10) {
+                Button {
+                    settingsPresented = true
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(Theme.Color.textPrimary)
+                }
+                if case .importing(let current, let total) = importState {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                        Text("\(current)/\(total)")
+                            .font(Theme.Font.caption)
+                            .foregroundStyle(Theme.Color.textSecondary)
+                    }
                 }
             }
         }
@@ -341,10 +361,13 @@ struct LibraryView: View {
         let title = defaultTitle(for: urlAsset, identifier: identifier)
         let creationDate = creationDate(for: identifier) ?? Date()
 
-        // Own the bytes so segments / beat data survive the user deleting the
-        // original from Photos. `try?` because failure is non-fatal: we still
-        // import with PHAsset-only fallback rather than blocking the user.
-        let originalFileName = try? await originalImporter.importCopy(of: urlAsset)
+        // Optionally own the bytes so segments / beat data survive the user
+        // deleting the original from Photos. `try?` because failure is
+        // non-fatal: we still import with the PHAsset reference rather than
+        // blocking the user.
+        let originalFileName = keepLocalCopies
+            ? try? await originalImporter.importCopy(of: urlAsset)
+            : nil
 
         let clip = DanceClip(
             title: title,
@@ -354,8 +377,25 @@ struct LibraryView: View {
             durationSeconds: duration.isFinite ? duration : 0
         )
         clip.originalFileName = originalFileName
+        clip.cloudAssetIdentifier = photosService.cloudIdentifier(forLocalIdentifier: identifier)
         modelContext.insert(clip)
         try modelContext.save()
+    }
+
+    /// Fills in `cloudAssetIdentifier` for clips imported before the field
+    /// existed (or when the mapping failed at import time). Runs once per
+    /// library appearance; the loop is a no-op when everything is mapped.
+    private func backfillCloudIdentifiers() {
+        var changed = false
+        for clip in clips where clip.cloudAssetIdentifier == nil {
+            if let cloudID = photosService.cloudIdentifier(forLocalIdentifier: clip.assetIdentifier) {
+                clip.cloudAssetIdentifier = cloudID
+                changed = true
+            }
+        }
+        if changed {
+            try? modelContext.save()
+        }
     }
 
     private func clipExists(withAssetIdentifier identifier: String) -> Bool {
