@@ -34,8 +34,13 @@ struct PracticeView: View {
         _vm = StateObject(
             wrappedValue: PracticePlayerViewModel(
                 assetIdentifier: clip.assetIdentifier,
+                cloudIdentifier: clip.cloudAssetIdentifier,
                 localFileURL: clip.preferredLocalFileURL,
-                player: sharedPlayer
+                player: sharedPlayer,
+                onLocalIdentifierRemapped: { healed in
+                    clip.assetIdentifier = healed
+                    try? clip.modelContext?.save()
+                }
             )
         )
         _poseCoordinator = StateObject(

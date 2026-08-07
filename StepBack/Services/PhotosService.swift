@@ -35,11 +35,44 @@ protocol PhotosServicing: AnyObject, Sendable {
     func currentAuthorizationStatus() -> PHAuthorizationStatus
     func resolveAVAsset(for identifier: String) async throws -> AVURLAsset
     func generateThumbnail(for asset: AVAsset, targetSize: CGSize) async throws -> Data
+    func cloudIdentifier(forLocalIdentifier identifier: String) -> String?
+    func localIdentifier(forCloudIdentifier cloudIdentifier: String) -> String?
+}
+
+/// Result of resolving a clip's video with cloud-identifier healing.
+struct ResolvedVideo {
+    let asset: AVURLAsset
+    /// Non-nil when the stored local identifier was stale and the asset was
+    /// found through its `PHCloudIdentifier` instead. Callers should persist
+    /// this back onto the clip so the next resolve is direct.
+    let remappedLocalIdentifier: String?
 }
 
 extension PhotosServicing {
     func generateThumbnail(for asset: AVAsset) async throws -> Data {
         try await generateThumbnail(for: asset, targetSize: CGSize(width: 400, height: 400))
+    }
+
+    /// Resolves a video by local identifier, falling back to the cloud
+    /// identifier when the local one no longer maps to an asset. Local
+    /// identifiers are device-library-scoped and can go stale across iCloud
+    /// Photo Library resyncs; the cloud identifier survives those.
+    func resolveAVAsset(
+        localIdentifier: String,
+        cloudIdentifier: String?
+    ) async throws -> ResolvedVideo {
+        do {
+            let asset = try await resolveAVAsset(for: localIdentifier)
+            return ResolvedVideo(asset: asset, remappedLocalIdentifier: nil)
+        } catch let error as PhotosError {
+            guard case .assetNotFound = error,
+                  let cloudIdentifier,
+                  let healed = self.localIdentifier(forCloudIdentifier: cloudIdentifier),
+                  healed != localIdentifier
+            else { throw error }
+            let asset = try await resolveAVAsset(for: healed)
+            return ResolvedVideo(asset: asset, remappedLocalIdentifier: healed)
+        }
     }
 }
 
@@ -97,6 +130,26 @@ final class PhotosService: PhotosServicing, @unchecked Sendable {
                 resume.run { continuation.resume(returning: urlAsset) }
             }
         }
+    }
+
+    // MARK: - Cloud identifiers
+
+    /// Maps a device-local `PHAsset` identifier to its stable
+    /// `PHCloudIdentifier` string. Nil when the asset doesn't exist or the
+    /// library can't produce a mapping (e.g. iCloud Photos disabled *and*
+    /// the asset missing — local-only assets still get an identifier).
+    func cloudIdentifier(forLocalIdentifier identifier: String) -> String? {
+        let mappings = PHPhotoLibrary.shared()
+            .cloudIdentifierMappings(forLocalIdentifiers: [identifier])
+        return try? mappings[identifier]?.get().stringValue
+    }
+
+    /// Inverse of `cloudIdentifier(forLocalIdentifier:)` — used to heal a
+    /// stale local identifier after an iCloud Photo Library resync.
+    func localIdentifier(forCloudIdentifier cloudIdentifier: String) -> String? {
+        let cloudID = PHCloudIdentifier(stringValue: cloudIdentifier)
+        let mappings = PHPhotoLibrary.shared().localIdentifierMappings(for: [cloudID])
+        return try? mappings[cloudID]?.get()
     }
 
     // MARK: - Thumbnails

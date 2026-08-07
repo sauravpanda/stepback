@@ -42,21 +42,29 @@ final class PracticePlayerViewModel: ObservableObject {
     /// uses this to scale the pulse bigger on the first beat of a measure.
     @Published private(set) var lastBeatWasDownbeat: Bool = false
 
-    private let assetIdentifier: String
+    private var assetIdentifier: String
+    private let cloudIdentifier: String?
     private var localFileURL: URL?
     private let photosService: PhotosServicing
     private var nowPlaying: NowPlayingController?
+    /// Fired when a stale local Photos identifier was healed through the
+    /// cloud identifier, so the owner can persist the fresh one on the clip.
+    private let onLocalIdentifierRemapped: ((String) -> Void)?
 
     init(
         assetIdentifier: String,
+        cloudIdentifier: String? = nil,
         localFileURL: URL? = nil,
         photosService: PhotosServicing = PhotosService(),
-        player: AVPlayer = AVPlayer()
+        player: AVPlayer = AVPlayer(),
+        onLocalIdentifierRemapped: ((String) -> Void)? = nil
     ) {
         self.assetIdentifier = assetIdentifier
+        self.cloudIdentifier = cloudIdentifier
         self.localFileURL = localFileURL
         self.photosService = photosService
         self.player = player
+        self.onLocalIdentifierRemapped = onLocalIdentifierRemapped
         attachTimeObserver()
     }
 
@@ -147,7 +155,15 @@ final class PracticePlayerViewModel: ObservableObject {
             if let localFileURL {
                 urlAsset = AVURLAsset(url: localFileURL)
             } else {
-                urlAsset = try await photosService.resolveAVAsset(for: assetIdentifier)
+                let resolved = try await photosService.resolveAVAsset(
+                    localIdentifier: assetIdentifier,
+                    cloudIdentifier: cloudIdentifier
+                )
+                urlAsset = resolved.asset
+                if let healed = resolved.remappedLocalIdentifier {
+                    assetIdentifier = healed
+                    onLocalIdentifierRemapped?(healed)
+                }
             }
             let loadedDuration = try await urlAsset.load(.duration).seconds
             let item = AVPlayerItem(asset: urlAsset)

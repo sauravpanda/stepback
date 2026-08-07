@@ -36,6 +36,18 @@ enum OriginalStorage {
         let url = fileURL(name: name)
         try? FileManager.default.removeItem(at: url)
     }
+
+    /// Bytes currently held by sandboxed original copies. Zero when the
+    /// directory doesn't exist yet.
+    static func totalBytes() -> Int64 {
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.fileSizeKey]
+        )) ?? []
+        return files.reduce(Int64(0)) { sum, url in
+            sum + Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        }
+    }
 }
 
 /// Copies an `AVURLAsset` resolved from the user's Photos library into the

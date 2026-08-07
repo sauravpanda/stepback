@@ -25,13 +25,23 @@ struct CompareView: View {
         _primary = StateObject(
             wrappedValue: PracticePlayerViewModel(
                 assetIdentifier: primary.assetIdentifier,
-                localFileURL: primary.preferredLocalFileURL
+                cloudIdentifier: primary.cloudAssetIdentifier,
+                localFileURL: primary.preferredLocalFileURL,
+                onLocalIdentifierRemapped: { healed in
+                    primary.assetIdentifier = healed
+                    try? primary.modelContext?.save()
+                }
             )
         )
         _secondary = StateObject(
             wrappedValue: PracticePlayerViewModel(
                 assetIdentifier: secondary.assetIdentifier,
-                localFileURL: secondary.preferredLocalFileURL
+                cloudIdentifier: secondary.cloudAssetIdentifier,
+                localFileURL: secondary.preferredLocalFileURL,
+                onLocalIdentifierRemapped: { healed in
+                    secondary.assetIdentifier = healed
+                    try? secondary.modelContext?.save()
+                }
             )
         )
     }
