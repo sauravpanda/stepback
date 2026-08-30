@@ -187,23 +187,10 @@ final class PoseCoordinateTransformTests: XCTestCase {
         )
         let recovered = PoseCoordinateTransform.normalizedImagePoint(
             containerFraction: fraction,
-            unitDisplayRect: unitRect,
-            mirrored: false
+            unitDisplayRect: unitRect
         )
         XCTAssertEqual(recovered?.x ?? -1, original.x, accuracy: accuracy)
         XCTAssertEqual(recovered?.y ?? -1, original.y, accuracy: accuracy)
-    }
-
-    func testNormalizedImagePointMirrorsX() {
-        let unitRect = CGRect(x: 0, y: 0, width: 1, height: 1)  // square in square
-        let recovered = PoseCoordinateTransform.normalizedImagePoint(
-            containerFraction: CGPoint(x: 0.2, y: 0.5),
-            unitDisplayRect: unitRect,
-            mirrored: true
-        )
-        // A touch at container-left (0.2) on a mirrored video is image-right.
-        XCTAssertEqual(recovered?.x ?? -1, 0.8, accuracy: accuracy)
-        XCTAssertEqual(recovered?.y ?? -1, 0.5, accuracy: accuracy)
     }
 
     func testNormalizedImagePointNilOutsideLetterbox() {
@@ -215,9 +202,73 @@ final class PoseCoordinateTransformTests: XCTestCase {
         )
         let recovered = PoseCoordinateTransform.normalizedImagePoint(
             containerFraction: CGPoint(x: 0.5, y: 0.05),
-            unitDisplayRect: unitRect,
-            mirrored: false
+            unitDisplayRect: unitRect
         )
         XCTAssertNil(recovered)
+    }
+
+    // MARK: - unrotatedFraction (touch → pre-rotation content)
+
+    func testUnrotatedFractionIdentityAtZeroTurns() {
+        let f = CGPoint(x: 0.2, y: 0.7)
+        XCTAssertEqual(PoseCoordinateTransform.unrotatedFraction(f, quarterTurns: 0), f)
+    }
+
+    func testUnrotatedFractionUndoes90Clockwise() {
+        // Rotating content 90° CW sends content (x, y) → display (1−y, x).
+        // The inverse must send display (0.3, 0.2) back to content (0.2, 0.7).
+        let recovered = PoseCoordinateTransform.unrotatedFraction(
+            CGPoint(x: 0.3, y: 0.2),
+            quarterTurns: 1
+        )
+        XCTAssertEqual(recovered.x, 0.2, accuracy: accuracy)
+        XCTAssertEqual(recovered.y, 0.7, accuracy: accuracy)
+    }
+
+    func testUnrotatedFractionUndoes180() {
+        let recovered = PoseCoordinateTransform.unrotatedFraction(
+            CGPoint(x: 0.3, y: 0.2),
+            quarterTurns: 2
+        )
+        XCTAssertEqual(recovered.x, 0.7, accuracy: accuracy)
+        XCTAssertEqual(recovered.y, 0.8, accuracy: accuracy)
+    }
+
+    func testUnrotatedFractionUndoes270Clockwise() {
+        // 270° CW ≡ 90° CCW: content (x, y) → display (y, 1−x); inverse of
+        // display (0.3, 0.2) is content (1−0.2, 0.3) = (0.8, 0.3).
+        let recovered = PoseCoordinateTransform.unrotatedFraction(
+            CGPoint(x: 0.3, y: 0.2),
+            quarterTurns: 3
+        )
+        XCTAssertEqual(recovered.x, 0.8, accuracy: accuracy)
+        XCTAssertEqual(recovered.y, 0.3, accuracy: accuracy)
+    }
+
+    func testUnrotatedFractionRoundTripsEveryQuarterTurn() {
+        // Forward rotation (CW by n quarter-turns) then the inverse must be
+        // the identity for all four states.
+        let original = CGPoint(x: 0.15, y: 0.85)
+        for turns in 0...3 {
+            var rotated = original
+            for _ in 0..<turns {
+                rotated = CGPoint(x: 1 - rotated.y, y: rotated.x)  // one 90° CW
+            }
+            let recovered = PoseCoordinateTransform.unrotatedFraction(rotated, quarterTurns: turns)
+            XCTAssertEqual(recovered.x, original.x, accuracy: accuracy, "turns=\(turns)")
+            XCTAssertEqual(recovered.y, original.y, accuracy: accuracy, "turns=\(turns)")
+        }
+    }
+
+    func testUnrotatedFractionNormalizesOutOfRangeTurns() {
+        let f = CGPoint(x: 0.3, y: 0.2)
+        XCTAssertEqual(
+            PoseCoordinateTransform.unrotatedFraction(f, quarterTurns: 5),
+            PoseCoordinateTransform.unrotatedFraction(f, quarterTurns: 1)
+        )
+        XCTAssertEqual(
+            PoseCoordinateTransform.unrotatedFraction(f, quarterTurns: -1),
+            PoseCoordinateTransform.unrotatedFraction(f, quarterTurns: 3)
+        )
     }
 }

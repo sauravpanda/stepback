@@ -12,8 +12,8 @@ struct ZoomablePlayerContainer<Content: View>: View {
     private let content: Content
     private let onSingleTap: (() -> Void)?
     /// Reports a long-press as a fraction (0…1) of the *un-zoomed* container,
-    /// so callers can map it back through their own letterbox/mirror to image
-    /// space. Used for "hold a dancer to track them."
+    /// so callers can map it back through their own letterbox/rotation to
+    /// image space. Used for "hold a dancer to track them."
     private let onLongPressLocated: ((CGPoint) -> Void)?
 
     init(

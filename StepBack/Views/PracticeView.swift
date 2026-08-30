@@ -13,8 +13,6 @@ struct PracticeView: View {
     @State private var splitSheetPresented = false
     @State private var editingSegment: ClipSegment?
     @State private var trimSheetPresented = false
-    @State private var comparePickerPresented = false
-    @State private var compareSecondary: DanceClip?
     @State private var editSheetPresented = false
     /// Hides the entire control stack so the video can claim the screen.
     /// Single-tap on the video remains wired to play/pause so pausing
@@ -60,8 +58,8 @@ struct PracticeView: View {
         .toolbar {
             // Trim moved into the inline action row below the scrubber for
             // discoverability — the chrome icon was hard to associate with
-            // "trim clip" at a glance. Compare and Mirror stay here because
-            // they're rarer and ergonomic next to the title.
+            // "trim clip" at a glance. Rotate stays here because it's rarer
+            // and ergonomic next to the title.
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 12) {
                     Button {
@@ -102,26 +100,22 @@ struct PracticeView: View {
                         : "Enable pose detection"
                     )
                     Button {
-                        comparePickerPresented = true
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            vm.rotate()
+                        }
                     } label: {
-                        Label("Compare", systemImage: "rectangle.2.swap")
+                        Label("Rotate", systemImage: "rotate.right")
                             .labelStyle(.titleAndIcon)
                             .font(.system(.footnote, design: .rounded, weight: .semibold))
-                            .foregroundStyle(Theme.Color.textPrimary)
+                            .foregroundStyle(vm.rotationQuarterTurns != 0
+                                ? Theme.Color.accent
+                                : Theme.Color.textPrimary
+                            )
                     }
-                    .accessibilityLabel("Compare with another clip")
-                    Button {
-                        vm.toggleMirror()
-                    } label: {
-                        Label("Mirror", systemImage: vm.mirrored
-                            ? "rectangle.portrait.on.rectangle.portrait.angled.fill"
-                            : "rectangle.portrait.on.rectangle.portrait.angled"
-                        )
-                        .labelStyle(.titleAndIcon)
-                        .font(.system(.footnote, design: .rounded, weight: .semibold))
-                        .foregroundStyle(vm.mirrored ? Theme.Color.accent : Theme.Color.textPrimary)
-                    }
-                    .accessibilityLabel(vm.mirrored ? "Unmirror video" : "Mirror video")
+                    .accessibilityLabel(vm.rotationQuarterTurns == 0
+                        ? "Rotate video"
+                        : "Rotate video, currently \(vm.rotationQuarterTurns * 90) degrees"
+                    )
                 }
             }
         }
@@ -153,14 +147,6 @@ struct PracticeView: View {
             poseCoordinator.stop()
         }
         .keepScreenAwake()
-        .sheet(isPresented: $comparePickerPresented) {
-            CompareClipPicker(excludedID: clip.id) { picked in
-                compareSecondary = picked
-            }
-        }
-        .navigationDestination(item: $compareSecondary) { secondary in
-            CompareView(primary: clip, secondary: secondary)
-        }
         .sheet(isPresented: $editSheetPresented) {
             ClipEditView(clip: clip)
                 .preferredColorScheme(.dark)
@@ -218,21 +204,31 @@ struct PracticeView: View {
                     onSingleTap: { vm.togglePlayPause() },
                     onLongPressLocated: { fraction in pinDancer(atContainerFraction: fraction) }
                 ) {
-                    ZStack {
-                        PlayerSurface(player: vm.player)
-                            .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
-                        if poseCoordinator.isActive {
-                            // Mirror the overlay alongside the video so the
-                            // skeleton tracks the actual displayed body, not
-                            // the original frame's body.
-                            PoseOverlay(
-                                pose: poseCoordinator.pose,
-                                imageSize: poseCoordinator.imageSize,
-                                poseAge: poseCoordinator.poseAge,
-                                debugCandidates: poseDebug ? poseCoordinator.candidates : []
-                            )
-                            .scaleEffect(x: vm.mirrored ? -1 : 1, y: 1)
+                    // Rotation: size the surface to axis-swapped bounds for
+                    // 90°/270° so the rotated result aspect-fits the
+                    // container, then spin it into place. The pose overlay
+                    // sits inside the same frame, so the skeleton rotates in
+                    // lockstep with the pixels it annotates.
+                    GeometryReader { geo in
+                        let quarterTurns = vm.rotationQuarterTurns
+                        let swapAxes = quarterTurns % 2 == 1
+                        ZStack {
+                            PlayerSurface(player: vm.player)
+                            if poseCoordinator.isActive {
+                                PoseOverlay(
+                                    pose: poseCoordinator.pose,
+                                    imageSize: poseCoordinator.imageSize,
+                                    poseAge: poseCoordinator.poseAge,
+                                    debugCandidates: poseDebug ? poseCoordinator.candidates : []
+                                )
+                            }
                         }
+                        .frame(
+                            width: swapAxes ? geo.size.height : geo.size.width,
+                            height: swapAxes ? geo.size.width : geo.size.height
+                        )
+                        .rotationEffect(.degrees(Double(quarterTurns) * 90))
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -331,14 +327,19 @@ struct PracticeView: View {
     /// size isn't known yet.
     private func pinDancer(atContainerFraction fraction: CGPoint) {
         guard poseCoordinator.isActive, let imageSize = poseCoordinator.imageSize else { return }
+        // The press arrives in rotated-display space; undo the rotation
+        // first so it lines up with the unrotated video frame.
+        let unrotated = PoseCoordinateTransform.unrotatedFraction(
+            fraction,
+            quarterTurns: vm.rotationQuarterTurns
+        )
         let unitRect = PoseCoordinateTransform.displayRect(
             imageSize: imageSize,
             in: CGSize(width: 1, height: 1)
         )
         guard let imagePoint = PoseCoordinateTransform.normalizedImagePoint(
-            containerFraction: fraction,
-            unitDisplayRect: unitRect,
-            mirrored: vm.mirrored
+            containerFraction: unrotated,
+            unitDisplayRect: unitRect
         ) else { return }
         poseCoordinator.pin(at: imagePoint)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()

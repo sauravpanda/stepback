@@ -15,7 +15,10 @@ final class PracticePlayerViewModel: ObservableObject {
     @Published private(set) var loopStart: Double?
     @Published private(set) var loopEnd: Double?
 
-    @Published var mirrored: Bool = false
+    /// Quarter-turns (90° clockwise each, 0…3) applied to the displayed
+    /// video. Display-only — the underlying asset and pose detection are
+    /// untouched; the view rotates the surface and un-rotates touches.
+    @Published private(set) var rotationQuarterTurns: Int = 0
 
     @Published private(set) var isAnalyzingBeats: Bool = false
     @Published var analysisError: String?
@@ -235,10 +238,12 @@ final class PracticePlayerViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Mirror
+    // MARK: - Rotation
 
-    func toggleMirror() {
-        mirrored.toggle()
+    /// Advances the display rotation by 90° clockwise, wrapping back to
+    /// upright after four taps.
+    func rotate() {
+        rotationQuarterTurns = (rotationQuarterTurns + 1) % 4
     }
 
     // MARK: - Beat detection
