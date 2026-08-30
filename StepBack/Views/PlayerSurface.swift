@@ -3,10 +3,9 @@ import SwiftUI
 import UIKit
 
 /// The single `AVPlayerLayer` host used by every video surface (practice,
-/// compare, trim). Previously this was copy-pasted into three views, and
-/// only the practice copy carried the background detach/reattach logic — so
-/// compare/trim playback would die when the app backgrounded. One surface,
-/// one behaviour.
+/// trim). Previously this was copy-pasted per view, and only the practice
+/// copy carried the background detach/reattach logic — so other surfaces'
+/// playback would die when the app backgrounded. One surface, one behaviour.
 struct PlayerSurface: UIViewRepresentable {
     let player: AVPlayer
 

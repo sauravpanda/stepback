@@ -72,22 +72,40 @@ enum PoseCoordinateTransform {
     }
 
     /// Inverse of `viewPoint`: maps a container fraction (0…1, top-left
-    /// origin — already un-zoomed via `unzoomedFraction`) to a normalized
-    /// Vision image point (0…1, bottom-left origin). `displayRect` must be
-    /// computed in a unit (1×1) container so it lives in the same fractional
-    /// space. Flips Y back, and un-mirrors X when the video is mirrored.
+    /// origin — already un-zoomed via `unzoomedFraction` and un-rotated via
+    /// `unrotatedFraction`) to a normalized Vision image point (0…1,
+    /// bottom-left origin). `displayRect` must be computed in a unit (1×1)
+    /// container so it lives in the same fractional space. Flips Y back.
     /// Returns nil if the fraction falls outside the letterboxed video.
     static func normalizedImagePoint(
         containerFraction f: CGPoint,
-        unitDisplayRect: CGRect,
-        mirrored: Bool
+        unitDisplayRect: CGRect
     ) -> CGPoint? {
         guard unitDisplayRect.width > 0, unitDisplayRect.height > 0 else { return nil }
         let nx = (f.x - unitDisplayRect.minX) / unitDisplayRect.width
         let nyTop = (f.y - unitDisplayRect.minY) / unitDisplayRect.height
         guard (0...1).contains(nx), (0...1).contains(nyTop) else { return nil }
-        let imageX = mirrored ? (1 - nx) : nx
         let imageY = 1 - nyTop  // flip to Vision's bottom-left origin
-        return CGPoint(x: imageX, y: imageY)
+        return CGPoint(x: nx, y: imageY)
+    }
+
+    /// Undoes a clockwise display rotation of `quarterTurns` × 90°: takes a
+    /// fraction (0…1, top-left origin) of the rotated container and returns
+    /// the matching fraction of the *unrotated* content. This is the touch
+    /// counterpart to rendering content in an axis-swapped frame and
+    /// applying `rotationEffect` — the display rotates one way, so touches
+    /// rotate back the other.
+    static func unrotatedFraction(
+        _ f: CGPoint,
+        quarterTurns: Int
+    ) -> CGPoint {
+        // Normalize to 0…3; Swift's % keeps the sign of the dividend.
+        let turns = ((quarterTurns % 4) + 4) % 4
+        switch turns {
+        case 1: return CGPoint(x: f.y, y: 1 - f.x)      // undo 90° CW
+        case 2: return CGPoint(x: 1 - f.x, y: 1 - f.y)  // undo 180°
+        case 3: return CGPoint(x: 1 - f.y, y: f.x)      // undo 270° CW
+        default: return f
+        }
     }
 }
