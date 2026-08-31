@@ -85,55 +85,6 @@ enum ListeningExercise: String, CaseIterable, Identifiable {
     }
 }
 
-/// What still has to happen before a clip can be drilled against.
-///
-/// The drills need two things the Practice tab already produces: a beat
-/// grid, and a user-placed beat 1. Modelling the gap explicitly lets the
-/// Listen tab walk the user through it in place instead of sending them to
-/// another tab and hoping they come back.
-enum ListeningReadiness: Equatable {
-    case needsBeats
-    case needsAnchor
-    case ready
-
-    init(hasBeatAnalysis: Bool, hasAnchor: Bool) {
-        if !hasBeatAnalysis {
-            self = .needsBeats
-        } else if !hasAnchor {
-            self = .needsAnchor
-        } else {
-            self = .ready
-        }
-    }
-
-    init(clip: DanceClip) {
-        self.init(
-            hasBeatAnalysis: clip.hasBeatAnalysis,
-            hasAnchor: clip.firstDownbeatSeconds != nil
-        )
-    }
-
-    var label: String {
-        switch self {
-        case .needsBeats: "Needs beats"
-        case .needsAnchor: "Needs beat 1"
-        case .ready: "Ready"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .needsBeats: "waveform"
-        case .needsAnchor: "hand.tap"
-        case .ready: "checkmark.circle.fill"
-        }
-    }
-
-    var isReady: Bool {
-        self == .ready
-    }
-}
-
 /// Outcome of a single Find the One answer.
 ///
 /// Two independent questions, because they're different failures: *did you

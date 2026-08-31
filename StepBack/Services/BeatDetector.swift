@@ -5,6 +5,16 @@ import Foundation
 struct BeatAnalysis: Equatable {
     let bpm: Double
     let beatTimes: [Double]
+    /// Best guess at where beat 1 falls, from low-band onset energy. Nil
+    /// when there aren't enough beats to judge. A guess, not gospel — the
+    /// UI always leaves the user a way to nudge it.
+    let downbeatSeconds: Double?
+
+    init(bpm: Double, beatTimes: [Double], downbeatSeconds: Double? = nil) {
+        self.bpm = bpm
+        self.beatTimes = beatTimes
+        self.downbeatSeconds = downbeatSeconds
+    }
 }
 
 enum BeatDetectorError: Error, Equatable {
@@ -16,8 +26,12 @@ enum BeatDetectorError: Error, Equatable {
 ///
 /// Pipeline: audio extraction → onset envelope via spectral flux (STFT) →
 /// tempo via autocorrelation of the onset envelope → phase alignment to
-/// generate absolute beat times. Downbeat anchoring is user-driven (#12)
-/// and therefore not attempted here.
+/// generate absolute beat times → downbeat placement from low-band onset
+/// energy.
+///
+/// The downbeat is a *guess*, offered so the Listen tab can start counting
+/// without making the user place beat 1 by hand. It is wrong often enough
+/// that every surface using it must keep a correction one tap away.
 enum BeatDetector {
 
     // MARK: - Tunables
@@ -30,6 +44,19 @@ enum BeatDetector {
     static let foldLowerBound: Double = 75
     static let foldUpperBound: Double = 160
 
+    /// FFT bins used to judge *which* beat is beat 1.
+    ///
+    /// At 22.05 kHz with a 1024-point window each bin spans ~21.5 Hz, so
+    /// `1..<8` covers roughly 21–172 Hz: the kick drum. Deliberately not
+    /// the broadband envelope — spectral flux peaks on the snare at least
+    /// as hard as the kick, and in most dance music the snare is on 2 and
+    /// 4, so a broadband guess would reliably anchor the count on the
+    /// backbeat. Bin 0 is DC and is skipped.
+    static let kickBins: Range<Int> = 1..<8
+
+    /// Default metre. Matches `DanceClip.beatsPerMeasure`.
+    static let defaultBeatsPerMeasure: Int = 4
+
     // MARK: - Public API
 
     static func analyze(asset: AVAsset) async throws -> BeatAnalysis {
@@ -39,19 +66,34 @@ enum BeatDetector {
 
     /// Pure entry point: feed a float-mono PCM buffer, get back BPM + beats.
     /// Exposed for tests and for future live-analysis experiments.
-    static func analyzeSamples(_ samples: [Float], sampleRate: Double) -> BeatAnalysis {
+    static func analyzeSamples(
+        _ samples: [Float],
+        sampleRate: Double,
+        beatsPerMeasure: Int = defaultBeatsPerMeasure
+    ) -> BeatAnalysis {
         guard samples.count >= windowSize else {
             return BeatAnalysis(bpm: 0, beatTimes: [])
         }
-        let onsets = computeOnsetEnvelope(
+        let envelopes = computeOnsetEnvelopes(
             samples: samples,
             windowSize: windowSize,
-            hopSize: hopSize
+            hopSize: hopSize,
+            lowBandBins: kickBins
         )
         let hopSeconds = Double(hopSize) / sampleRate
-        let bpm = estimateTempo(onsets: onsets, hopSeconds: hopSeconds)
-        let beatTimes = alignBeats(onsets: onsets, bpm: bpm, hopSeconds: hopSeconds)
-        return BeatAnalysis(bpm: bpm, beatTimes: beatTimes)
+        let bpm = estimateTempo(onsets: envelopes.full, hopSeconds: hopSeconds)
+        let beatTimes = alignBeats(onsets: envelopes.full, bpm: bpm, hopSeconds: hopSeconds)
+        let phase = estimateDownbeatPhase(
+            lowBandOnsets: envelopes.lowBand,
+            beatTimes: beatTimes,
+            hopSeconds: hopSeconds,
+            beatsPerMeasure: beatsPerMeasure
+        )
+        return BeatAnalysis(
+            bpm: bpm,
+            beatTimes: beatTimes,
+            downbeatSeconds: phase.flatMap { beatTimes.indices.contains($0) ? beatTimes[$0] : nil }
+        )
     }
 
     // MARK: - Audio extraction
@@ -108,16 +150,38 @@ enum BeatDetector {
 
     // MARK: - Onset envelope (half-wave rectified spectral flux)
 
+    /// Broadband onset envelope — what tempo estimation runs on.
     static func computeOnsetEnvelope(
         samples: [Float],
         windowSize: Int,
         hopSize: Int
     ) -> [Float] {
+        computeOnsetEnvelopes(
+            samples: samples,
+            windowSize: windowSize,
+            hopSize: hopSize,
+            lowBandBins: kickBins
+        ).full
+    }
+
+    /// Broadband and low-band onset envelopes from a **single** STFT pass.
+    ///
+    /// Tempo wants the whole spectrum; downbeat placement wants only the
+    /// kick band. Running the FFT twice to get them would double the cost
+    /// of analysing a clip for no reason, so both are accumulated as the
+    /// same spectra are computed.
+    static func computeOnsetEnvelopes(
+        samples: [Float],
+        windowSize: Int,
+        hopSize: Int,
+        lowBandBins: Range<Int>
+    ) -> (full: [Float], lowBand: [Float]) {
         let halfSize = windowSize / 2
         let log2N = vDSP_Length(log2(Double(windowSize)).rounded())
         guard let fftSetup = vDSP_create_fftsetup(log2N, FFTRadix(kFFTRadix2)) else {
-            return []
+            return ([], [])
         }
+        let lowBand = lowBandBins.clamped(to: 0..<halfSize)
         defer { vDSP_destroy_fftsetup(fftSetup) }
 
         var window = [Float](repeating: 0, count: windowSize)
@@ -131,6 +195,7 @@ enum BeatDetector {
         var diff = [Float](repeating: 0, count: halfSize)
 
         var onsets: [Float] = []
+        var lowOnsets: [Float] = []
         var pos = 0
         let limit = samples.count - windowSize
 
@@ -179,17 +244,31 @@ enum BeatDetector {
                 vDSP_vthr(base, 1, &zero, base, 1, vDSP_Length(buf.count))
             }
             var flux: Float = 0
-            vDSP_sve(diff, 1, &flux, vDSP_Length(halfSize))
+            var lowFlux: Float = 0
+            diff.withUnsafeBufferPointer { buf in
+                guard let base = buf.baseAddress else { return }
+                vDSP_sve(base, 1, &flux, vDSP_Length(halfSize))
+                guard !lowBand.isEmpty else { return }
+                vDSP_sve(
+                    base.advanced(by: lowBand.lowerBound), 1,
+                    &lowFlux,
+                    vDSP_Length(lowBand.count)
+                )
+            }
 
             onsets.append(flux)
+            lowOnsets.append(lowFlux)
             previousMagnitudes = magnitudes
             pos += hopSize
         }
+        return (normalised(onsets), normalised(lowOnsets))
+    }
 
-        if let peak = onsets.max(), peak > 0 {
-            onsets = onsets.map { $0 / peak }
-        }
-        return onsets
+    /// Scales an envelope to a 0...1 peak so the two bands are comparable
+    /// and thresholds don't depend on absolute loudness.
+    private static func normalised(_ envelope: [Float]) -> [Float] {
+        guard let peak = envelope.max(), peak > 0 else { return envelope }
+        return envelope.map { $0 / peak }
     }
 
     // MARK: - Tempo via autocorrelation
@@ -261,5 +340,70 @@ enum BeatDetector {
             beatIndex += 1
         }
         return beats
+    }
+}
+
+// MARK: - Downbeat placement
+
+/// Split into an extension to keep the enum body under SwiftLint's
+/// `type_body_length` limit; these are ordinary members of `BeatDetector`.
+extension BeatDetector {
+
+    /// Index of the beat most likely to be beat 1, judged by kick energy.
+    ///
+    /// Every beat belongs to one of `beatsPerMeasure` phases. Summing
+    /// low-band onset strength across each phase and taking the strongest
+    /// picks out the one the kick lands on, which in practice is the "one".
+    /// Returns nil when there isn't a full measure of beats to compare, in
+    /// which case guessing would be noise.
+    ///
+    /// The returned value is an index into `beatTimes`, and is always the
+    /// *first* beat of that phase so the anchor sits as early in the clip
+    /// as possible.
+    static func estimateDownbeatPhase(
+        lowBandOnsets: [Float],
+        beatTimes: [Double],
+        hopSeconds: Double,
+        beatsPerMeasure: Int
+    ) -> Int? {
+        guard !lowBandOnsets.isEmpty,
+              hopSeconds > 0,
+              beatsPerMeasure > 0,
+              beatTimes.count >= beatsPerMeasure else {
+            return nil
+        }
+
+        var scores = [Double](repeating: 0, count: beatsPerMeasure)
+        for (index, time) in beatTimes.enumerated() {
+            scores[index % beatsPerMeasure] += Double(
+                strength(of: lowBandOnsets, atTime: time, hopSeconds: hopSeconds)
+            )
+        }
+        guard let best = scores.indices.max(by: { scores[$0] < scores[$1] }) else { return nil }
+        // No kick energy anywhere on the grid — silence, or audio with no
+        // low end at all. `estimateTempo` will still have produced a beat
+        // grid from a flat envelope, so without this the caller would get a
+        // confidently-placed "one" derived from nothing. Declining lets the
+        // UI say it doesn't know instead.
+        guard scores[best] > 0 else { return nil }
+        return best
+    }
+
+    /// Peak envelope value within one hop either side of `time`.
+    ///
+    /// `alignBeats` emits beat times on exact hop boundaries, but a beat
+    /// grid that has been rescaled or hand-nudged will not be, so sampling
+    /// a single index would sometimes read the trough beside an onset
+    /// rather than the onset itself.
+    private static func strength(
+        of envelope: [Float],
+        atTime time: Double,
+        hopSeconds: Double
+    ) -> Float {
+        let centre = Int((time / hopSeconds).rounded())
+        let lower = max(0, centre - 1)
+        let upper = min(envelope.count - 1, centre + 1)
+        guard lower <= upper else { return 0 }
+        return envelope[lower...upper].max() ?? 0
     }
 }

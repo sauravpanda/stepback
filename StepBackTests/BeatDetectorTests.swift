@@ -117,4 +117,131 @@ final class BeatDetectorTests: XCTestCase {
             []
         )
     }
+
+    // MARK: - Downbeat placement
+
+    /// Click track where each beat gets a plain 1 kHz tick, plus an
+    /// optional accent on one phase of the measure. `kickHz` accents land
+    /// in the low band the downbeat estimator reads; `snareHz` accents sit
+    /// well above it.
+    private func accentedTrack(
+        bpm: Double,
+        duration: Double,
+        beatsPerMeasure: Int,
+        kickPhase: Int?,
+        snarePhase: Int? = nil
+    ) -> [Float] {
+        var samples = clickTrack(bpm: bpm, duration: duration, sampleRate: sampleRate)
+        let beatInterval = 60.0 / bpm
+        let totalSamples = samples.count
+        let beats = Int(duration / beatInterval) + 1
+
+        for beatIndex in 0..<beats {
+            let phase = beatIndex % beatsPerMeasure
+            let isKick = phase == kickPhase
+            let isSnare = phase == snarePhase
+            guard isKick || isSnare else { continue }
+
+            // 60Hz sits in kickBins (bin ~3); 3kHz is far outside it.
+            let frequency: Double = isKick ? 60 : 3_000
+            let decay: Double = isKick ? 8 : 30
+            let start = Int(Double(beatIndex) * beatInterval * sampleRate)
+            let length = Int(0.12 * sampleRate)
+            for offset in 0..<length {
+                let idx = start + offset
+                if idx >= totalSamples { break }
+                let localTime = Double(offset) / sampleRate
+                let envelope = exp(-localTime * decay)
+                samples[idx] += Float(sin(2 * .pi * frequency * localTime) * envelope * 0.9)
+            }
+        }
+        return samples
+    }
+
+    private func estimatePhase(
+        in samples: [Float],
+        bpm: Double,
+        duration: Double,
+        beatsPerMeasure: Int = 4
+    ) -> Int? {
+        let envelopes = BeatDetector.computeOnsetEnvelopes(
+            samples: samples,
+            windowSize: BeatDetector.windowSize,
+            hopSize: BeatDetector.hopSize,
+            lowBandBins: BeatDetector.kickBins
+        )
+        let interval = 60.0 / bpm
+        let beats = Array(stride(from: 0.0, to: duration, by: interval))
+        return BeatDetector.estimateDownbeatPhase(
+            lowBandOnsets: envelopes.lowBand,
+            beatTimes: beats,
+            hopSeconds: Double(BeatDetector.hopSize) / sampleRate,
+            beatsPerMeasure: beatsPerMeasure
+        )
+    }
+
+    func testFindsDownbeatWhenKickIsOnBeatOne() {
+        let samples = accentedTrack(
+            bpm: 120, duration: 16, beatsPerMeasure: 4, kickPhase: 0
+        )
+        XCTAssertEqual(estimatePhase(in: samples, bpm: 120, duration: 16), 0)
+    }
+
+    func testFindsDownbeatWhenKickIsOnAnOffsetPhase() {
+        let samples = accentedTrack(
+            bpm: 120, duration: 16, beatsPerMeasure: 4, kickPhase: 2
+        )
+        XCTAssertEqual(estimatePhase(in: samples, bpm: 120, duration: 16), 2)
+    }
+
+    func testSnareOnTheBackbeatDoesNotStealTheDownbeat() {
+        // The whole reason the estimator reads the kick band rather than the
+        // broadband envelope: here the snare on beat 3 is louder in overall
+        // spectral flux than the kick on beat 1, and a broadband guess would
+        // anchor the count on the backbeat.
+        let samples = accentedTrack(
+            bpm: 120, duration: 16, beatsPerMeasure: 4, kickPhase: 0, snarePhase: 2
+        )
+        XCTAssertEqual(estimatePhase(in: samples, bpm: 120, duration: 16), 0)
+    }
+
+    func testDownbeatIsNilWithoutAFullMeasureOfBeats() {
+        XCTAssertNil(
+            BeatDetector.estimateDownbeatPhase(
+                lowBandOnsets: [0.1, 0.9, 0.2],
+                beatTimes: [0, 0.5, 1.0],
+                hopSeconds: 0.023,
+                beatsPerMeasure: 4
+            )
+        )
+    }
+
+    func testDownbeatIsNilWithoutAnEnvelope() {
+        XCTAssertNil(
+            BeatDetector.estimateDownbeatPhase(
+                lowBandOnsets: [],
+                beatTimes: [0, 0.5, 1.0, 1.5],
+                hopSeconds: 0.023,
+                beatsPerMeasure: 4
+            )
+        )
+    }
+
+    func testAnalysisSurfacesTheDownbeatAsATimestamp() {
+        let samples = accentedTrack(
+            bpm: 120, duration: 16, beatsPerMeasure: 4, kickPhase: 0
+        )
+        let analysis = BeatDetector.analyzeSamples(samples, sampleRate: sampleRate)
+        let downbeat = analysis.downbeatSeconds
+        XCTAssertNotNil(downbeat)
+        // Whatever beat it picked must actually be on the detected grid.
+        XCTAssertTrue(analysis.beatTimes.contains { abs($0 - (downbeat ?? -1)) < 1e-9 })
+    }
+
+    func testSilenceYieldsNoDownbeat() {
+        let analysis = BeatDetector.analyzeSamples(
+            [Float](repeating: 0, count: Int(sampleRate * 4)), sampleRate: sampleRate
+        )
+        XCTAssertNil(analysis.downbeatSeconds)
+    }
 }

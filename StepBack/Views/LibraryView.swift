@@ -661,6 +661,14 @@ enum LibraryFormatter {
         return String(format: "%d:%02d", whole / 60, whole % 60)
     }
 
+    /// Playhead position, where zero is a real reading rather than a missing
+    /// one. `duration` renders 0 as "--:--" because a clip of no length is
+    /// unknown, but a player parked at the start is genuinely at 0:00.
+    static func position(_ seconds: Double) -> String {
+        guard seconds.isFinite, seconds > 0 else { return "0:00" }
+        return duration(seconds)
+    }
+
     /// Compact date for library cells — "Mar 11" within the current year,
     /// "Mar 11, 2025" for prior years. The cell subtitle is constrained to a
     /// single line, so the verbose default `.date` style overflows.

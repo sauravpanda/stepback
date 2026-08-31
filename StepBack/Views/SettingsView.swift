@@ -3,6 +3,9 @@ import SwiftUI
 
 enum SettingsKeys {
     static let keepLocalCopies = "keepLocalCopies"
+    /// How finely the Listen tab counts — a habit rather than a per-clip
+    /// fact, so it is a preference rather than a stored model attribute.
+    static let countSubdivision = "countSubdivision"
 }
 
 /// App settings: whether imports copy video bytes into the sandbox, plus a
