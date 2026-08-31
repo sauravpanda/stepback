@@ -271,9 +271,14 @@ final class PracticePlayerViewModel: ObservableObject {
         }
     }
 
-    /// Marks `currentTime` as beat 1. Caller persists.
+    /// Marks the current playback position as beat 1. Caller persists.
+    ///
+    /// Reads `precisePlaybackTime` rather than `currentTime`: every measure
+    /// counter, downbeat pulse and phrase grid in the app is derived from
+    /// this one value, so quantisation error here shifts everything
+    /// downstream.
     func tapOnBeatOne(for clip: DanceClip, onSave: @escaping () -> Void) {
-        clip.firstDownbeatSeconds = currentTime
+        clip.firstDownbeatSeconds = precisePlaybackTime
         onSave()
     }
 
@@ -293,11 +298,12 @@ final class PracticePlayerViewModel: ObservableObject {
 
     func recordStepTap(against beatTimes: [Double]) {
         guard stepTimingActive, !beatTimes.isEmpty else { return }
+        let tapTime = precisePlaybackTime
         guard let offset = BeatGrid.offsetMs(
-            from: currentTime,
+            from: tapTime,
             toNearestBeatIn: beatTimes
         ) else { return }
-        stepTaps.append(StepTap(time: currentTime, offsetMs: offset))
+        stepTaps.append(StepTap(time: tapTime, offsetMs: offset))
     }
 
     func clearStepTaps() {
@@ -420,5 +426,26 @@ enum LoopEvaluator {
             return .seek(to: start)
         }
         return .none
+    }
+}
+
+// MARK: - Precise timing
+
+extension PracticePlayerViewModel {
+
+    /// Transport position read straight from the player, for grading taps.
+    ///
+    /// `currentTime` is only refreshed by the 0.1s periodic observer, which
+    /// is the right cadence for driving UI but leaves it up to 100ms stale
+    /// — far too coarse to score against, when `StepRating` calls anything
+    /// under 50ms "perfect". Falls back to the published value when the
+    /// player reports a non-finite time (nothing loaded yet).
+    ///
+    /// Declared out of line only to avoid growing a class body that is
+    /// already over SwiftLint's `type_body_length` limit.
+    var precisePlaybackTime: Double {
+        let seconds = player.currentTime().seconds
+        guard seconds.isFinite else { return currentTime }
+        return max(0, min(seconds, duration))
     }
 }
