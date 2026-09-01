@@ -375,10 +375,18 @@ extension PracticePlayerViewModel {
     /// The Listen tab uses this to fold a metronome click into the audio.
     /// Going back through `load()` would re-resolve the Photos asset and
     /// drop the user's place in the track; this keeps both.
+    /// Returns whether the swap succeeded.
+    ///
+    /// Callers need the outcome of *this* call, not the state of
+    /// `loadError`: that field is sticky, so a caller inferring failure from
+    /// it would keep rolling back forever after one unrelated hiccup. A
+    /// successful rebuild also clears it, because a stale message describing
+    /// a load that has since been superseded is just noise on screen.
+    @discardableResult
     func rebuildItem(
         transform: ((AVURLAsset) async throws -> AVAsset)? = nil
-    ) async {
-        guard let sourceAsset else { return }
+    ) async -> Bool {
+        guard let sourceAsset else { return false }
         let resumeAt = precisePlaybackTime
         let wasPlaying = isPlaying
         pause()
@@ -392,8 +400,11 @@ extension PracticePlayerViewModel {
             if wasPlaying {
                 play()
             }
+            loadError = nil
+            return true
         } catch {
             loadError = error.localizedDescription
+            return false
         }
     }
 

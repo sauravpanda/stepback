@@ -11,6 +11,7 @@
 		03C973FD27336E9DD2EDE507 /* PracticeBeatUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC6BAE20433D2ED45F00AD41 /* PracticeBeatUI.swift */; };
 		098DA938E40292AA4E5238C5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018D2C7BF9E56956DC2D3202 /* SettingsView.swift */; };
 		0D16A4ECF9075D8853C9E93A /* ListeningDrillStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CA903EF426C5859033A9B7 /* ListeningDrillStateTests.swift */; };
+		0D668E2C856C00A5C8806A23 /* DrillUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89049437E63D50C5452D5760 /* DrillUI.swift */; };
 		1724638BD2B70699A591FE9B /* AutoTagService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99CA1B5B91B8D4637FEEF872 /* AutoTagService.swift */; };
 		1D0BE1897582A939153E6CE8 /* ClipEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D25E6771271EDD5B867F61E /* ClipEditView.swift */; };
 		1EC09265A1CD5B1E67415B39 /* StepBackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023608F63978F9D1668F5AFC /* StepBackApp.swift */; };
@@ -129,6 +130,7 @@
 		808127290713ACE9855DA35E /* StepBackMigrationPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepBackMigrationPlanTests.swift; sourceTree = "<group>"; };
 		848D52E156E709AA0226CEE8 /* ModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsTests.swift; sourceTree = "<group>"; };
 		87BD8CD6749EE6D846064C4F /* ListeningPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningPlayerView.swift; sourceTree = "<group>"; };
+		89049437E63D50C5452D5760 /* DrillUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrillUI.swift; sourceTree = "<group>"; };
 		8AAC69A2C2F4F581525FFA41 /* PoseSmootherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoseSmootherTests.swift; sourceTree = "<group>"; };
 		8B4B3FD6B0A004C787FC243B /* LibraryFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFormatterTests.swift; sourceTree = "<group>"; };
 		8D25E6771271EDD5B867F61E /* ClipEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditView.swift; sourceTree = "<group>"; };
@@ -190,6 +192,7 @@
 			isa = PBXGroup;
 			children = (
 				8D25E6771271EDD5B867F61E /* ClipEditView.swift */,
+				89049437E63D50C5452D5760 /* DrillUI.swift */,
 				AAB30650146433E889DC2AF4 /* LibraryView.swift */,
 				87BD8CD6749EE6D846064C4F /* ListeningPlayerView.swift */,
 				ABA653C043E2599A2530242B /* ListeningUI.swift */,
@@ -405,6 +408,7 @@
 				691A3AE86C110C252A1412FE /* BeatGrid.swift in Sources */,
 				1D0BE1897582A939153E6CE8 /* ClipEditView.swift in Sources */,
 				A126D36EEB2C8B0AAD6996F4 /* CountSubdivision.swift in Sources */,
+				0D668E2C856C00A5C8806A23 /* DrillUI.swift in Sources */,
 				72A012D3DCF8FA13D69C1868 /* KeepScreenAwake.swift in Sources */,
 				A88000A1ACD9503F7A9D6143 /* LibraryView.swift in Sources */,
 				A6B0224046591AE32D010991 /* ListenView.swift in Sources */,

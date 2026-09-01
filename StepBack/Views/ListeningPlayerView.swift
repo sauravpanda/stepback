@@ -29,6 +29,9 @@ struct ListeningPlayerView: View {
     @AppStorage(SettingsKeys.countSubdivision) private var subdivisionRaw = CountSubdivision.quarter.rawValue
 
     @State private var metronomeOn = false
+    /// Scratch file behind the current click mix, held so it can be deleted
+    /// once the player has moved off it.
+    @State private var clickTrackURL: URL?
     @State private var isSwitchingAudio = false
     @State private var drillsShown = false
     @State private var exercise: ListeningExercise = .phraseCatcher
@@ -70,7 +73,19 @@ struct ListeningPlayerView: View {
                     onTapBeatOne: tapOnBeatOne
                 )
                 if drillsShown {
-                    drillSection
+                    DrillPanel(
+                        exercise: exercise,
+                        run: run,
+                        slotStates: run.plan.map(slotStates(for:)) ?? [],
+                        revealPhrases: $revealPhrases,
+                        onSelectExercise: { newValue in
+                            exercise = newValue
+                            vm.pause()
+                            run.reset()
+                        },
+                        onStart: startDrill,
+                        onTap: recordDrillTap
+                    )
                 }
                 if let error = vm.loadError ?? vm.analysisError {
                     Text(error)
@@ -87,7 +102,11 @@ struct ListeningPlayerView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .keepScreenAwake()
         .task { await prepare() }
-        .onDisappear { vm.pause() }
+        .onDisappear {
+            vm.pause()
+            MetronomeMixer.discardClickTrack(at: clickTrackURL)
+            clickTrackURL = nil
+        }
         .onChange(of: vm.currentTime) { _, now in
             guard run.hasRunOut(at: now) else { return }
             vm.pause()
@@ -200,65 +219,6 @@ struct ListeningPlayerView: View {
         }
     }
 
-    private var drillSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Divider().overlay(Theme.Color.divider)
-            ExercisePicker(selected: exercise) { newValue in
-                exercise = newValue
-                vm.pause()
-                run.reset()
-            }
-            Text(exercise.blurb)
-                .font(Theme.Font.caption)
-                .foregroundStyle(Theme.Color.textSecondary)
-            if exercise == .countItOut, run.phase == .idle {
-                Stepper(value: $revealPhrases, in: 1...4) {
-                    Text("Counter visible for \(revealPhrases) × 8")
-                        .font(Theme.Font.caption)
-                        .foregroundStyle(Theme.Color.textSecondary)
-                }
-                .tint(Theme.Color.accent)
-            }
-            if let plan = run.plan, run.phase != .idle {
-                PhraseRibbon(states: slotStates(for: plan))
-            }
-            drillTapTarget
-            if let planError = run.planError {
-                Text(planError)
-                    .font(Theme.Font.caption)
-                    .foregroundStyle(Color(hex: 0xFF5F5F))
-            }
-            drillResults
-        }
-    }
-
-    @ViewBuilder
-    private var drillTapTarget: some View {
-        if run.phase == .running {
-            BigTapTarget(
-                title: "Tap",
-                subtitle: exercise == .findTheOne ? "on beat 1" : "on every 1 of the phrase",
-                isEnabled: true,
-                onTap: recordDrillTap
-            )
-        } else {
-            BigTapTarget(
-                title: run.phase == .finished ? "Go again" : "Start",
-                subtitle: exercise.title,
-                isEnabled: true,
-                onTap: startDrill
-            )
-        }
-    }
-
-    @ViewBuilder
-    private var drillResults: some View {
-        if let oneShot = run.oneShot {
-            FindTheOneCard(result: oneShot, onRetry: startDrill)
-        } else if let score = run.score {
-            DrillResultsCard(score: score, onRetry: startDrill)
-        }
-    }
 }
 
 // MARK: - Derived state
@@ -425,11 +385,12 @@ private extension ListeningPlayerView {
 
         guard turningOn else {
             await vm.rebuildItem()
+            MetronomeMixer.discardClickTrack(at: clickTrackURL)
+            clickTrackURL = nil
             configureBeatPulse()
             return
         }
-        await installClickTrack()
-        if vm.loadError != nil {
+        if await !installClickTrack() {
             metronomeOn = false
         }
         configureBeatPulse()
@@ -450,7 +411,8 @@ private extension ListeningPlayerView {
     ///
     /// The stored grid is left alone — subdivisions are expanded only for
     /// the click, so drills and step timing keep scoring against real beats.
-    func installClickTrack() async {
+    @discardableResult
+    func installClickTrack() async -> Bool {
         let beats = clip.beatTimes
         let perBeat = subdivision.perBeat
         let clicks = PhraseGrid.subdivide(beatTimes: beats, perBeat: perBeat)
@@ -470,14 +432,25 @@ private extension ListeningPlayerView {
             }
         }
 
-        await vm.rebuildItem { source in
-            try await MetronomeMixer.composedAsset(
+        // Captured out of the transform so the previous file can be
+        // released only after the player has actually switched off it.
+        let previousURL = clickTrackURL
+        var installedURL: URL?
+        let ok = await vm.rebuildItem { source in
+            let composed = try await MetronomeMixer.composedAsset(
                 source: source,
                 beatTimes: clicks,
                 downbeatIndices: downbeats,
                 subdivisionIndices: subdivisions
             )
+            installedURL = composed.fileURL
+            return composed.asset
         }
+        if let installedURL {
+            clickTrackURL = installedURL
+            MetronomeMixer.discardClickTrack(at: previousURL)
+        }
+        return ok
     }
 }
 
@@ -495,6 +468,7 @@ private extension ListeningPlayerView {
         clip.firstDownbeatSeconds = shifted
         try? modelContext.save()
         configureBeatPulse()
+        Task { await refreshClickTrackIfOn() }
     }
 
     func tapOnBeatOne() {
@@ -502,6 +476,7 @@ private extension ListeningPlayerView {
             try? modelContext.save()
         }
         configureBeatPulse()
+        Task { await refreshClickTrackIfOn() }
     }
 }
 

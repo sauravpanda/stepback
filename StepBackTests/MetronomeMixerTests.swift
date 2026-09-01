@@ -113,4 +113,42 @@ final class MetronomeMixerTests: XCTestCase {
             .attributesOfItem(atPath: url.path)[.size] as? Int ?? 0
         XCTAssertGreaterThan(size, 0)
     }
+
+    // MARK: - Scratch file lifecycle
+
+    func testEachRenderGetsItsOwnFile() throws {
+        // Distinct URLs matter: the old file has to stay readable until the
+        // player has actually switched off it.
+        let first = try MetronomeMixer.writeClickTrack(
+            beatTimes: [0, 0.5], downbeatIndices: [0], duration: 1
+        )
+        let second = try MetronomeMixer.writeClickTrack(
+            beatTimes: [0, 0.5], downbeatIndices: [0], duration: 1
+        )
+        defer {
+            MetronomeMixer.discardClickTrack(at: first)
+            MetronomeMixer.discardClickTrack(at: second)
+        }
+        XCTAssertNotEqual(first, second)
+    }
+
+    func testDiscardRemovesTheFile() throws {
+        let url = try MetronomeMixer.writeClickTrack(
+            beatTimes: [0], downbeatIndices: [], duration: 1
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        MetronomeMixer.discardClickTrack(at: url)
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: url.path),
+            "click tracks run to tens of megabytes; leaving them behind fills the temp directory"
+        )
+    }
+
+    func testDiscardIsSafeOnNilAndMissingFiles() {
+        // Called on teardown paths where there may never have been a file.
+        MetronomeMixer.discardClickTrack(at: nil)
+        let absent = FileManager.default.temporaryDirectory
+            .appendingPathComponent("stepback-click-does-not-exist.caf")
+        MetronomeMixer.discardClickTrack(at: absent)
+    }
 }
