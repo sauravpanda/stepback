@@ -4,9 +4,9 @@ import UIKit
 
 /// The Listen tab: pick a clip, then drill your ear against its beat grid.
 ///
-/// Deliberately a thin picker. Everything else — detecting beats, placing
-/// beat 1, running a drill — happens on one screen in `ListeningDrillView`,
-/// so there is only ever a single AVPlayer alive in this tab.
+/// Deliberately a thin picker. Everything else happens on one screen in
+/// `ListeningPlayerView`, so there is only ever a single AVPlayer alive in
+/// this tab.
 struct ListenView: View {
 
     @Query(sort: \DanceClip.dateAdded, order: .reverse) private var clips: [DanceClip]
@@ -19,7 +19,7 @@ struct ListenView: View {
                 .toolbarBackground(Theme.Color.background, for: .navigationBar)
                 .toolbarColorScheme(.dark, for: .navigationBar)
                 .navigationDestination(for: DanceClip.self) { clip in
-                    ListeningDrillView(clip: clip)
+                    ListeningPlayerView(clip: clip)
                 }
         }
     }
@@ -46,7 +46,7 @@ struct ListenView: View {
     }
 
     private var intro: some View {
-        Text("Train the musical half: find beat 1, hear the phrase turn over, hold the count on your own.")
+        Text("Pick a track. It finds the beat and starts counting on its own.")
             .font(Theme.Font.caption)
             .foregroundStyle(Theme.Color.textTertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -61,7 +61,7 @@ struct ListenView: View {
             Text("Nothing to listen to yet")
                 .font(Theme.Font.title)
                 .foregroundStyle(Theme.Color.textPrimary)
-            Text("Import a clip in the Library tab. Any clip with audio works — the drills run off its beat grid.")
+            Text("Import a clip in the Library tab. Any clip with audio works — the beat grid is found for you.")
                 .font(Theme.Font.caption)
                 .foregroundStyle(Theme.Color.textSecondary)
                 .multilineTextAlignment(.center)
@@ -85,16 +85,21 @@ private struct ListeningClipRow: View {
                     .foregroundStyle(Theme.Color.textPrimary)
                     .lineLimit(1)
                 HStack(spacing: 6) {
-                    if let bpm = clip.bpm {
+                    // Only what's known. A clip that hasn't been analysed
+                    // yet says nothing rather than announcing a chore —
+                    // opening it does the work automatically.
+                    if let bpm = clip.bpm, bpm > 0 {
                         Text("\(Int(bpm.rounded())) BPM")
                             .font(.system(.caption2, design: .rounded, weight: .bold))
                             .foregroundStyle(Theme.Color.accent)
+                        Text("·")
+                            .font(Theme.Font.caption)
+                            .foregroundStyle(Theme.Color.textTertiary)
                     }
                     Text(LibraryFormatter.duration(clip.durationSeconds))
                         .font(Theme.Font.caption)
                         .foregroundStyle(Theme.Color.textTertiary)
                 }
-                ReadinessBadge(readiness: ListeningReadiness(clip: clip))
             }
             Spacer()
             Image(systemName: "chevron.right")

@@ -176,3 +176,88 @@ enum PhraseGrid {
         return score
     }
 }
+
+// MARK: - Navigation
+
+/// Transport helpers for moving around a track in musical units rather
+/// than seconds. Separated into an extension to keep the enum body inside
+/// SwiftLint's `type_body_length` limit.
+extension PhraseGrid {
+
+    /// How far into a phrase you can be and still have "previous" mean
+    /// *restart this one*, matching the way a music player's back button
+    /// behaves within a track.
+    static let rewindGraceSeconds: Double = 1.0
+
+    /// The next phrase start strictly after `time`, or nil at the last one.
+    static func phraseStart(
+        after time: Double,
+        beatTimes: [Double],
+        anchor: Double?,
+        phraseLength: Int
+    ) -> Double? {
+        phraseStartTimes(beatTimes: beatTimes, anchor: anchor, phraseLength: phraseLength)
+            .first { $0 > time }
+    }
+
+    /// Where a "previous phrase" press should land.
+    ///
+    /// Within `rewindGraceSeconds` of the current phrase start it steps back
+    /// to the previous phrase; past that it returns to the top of the
+    /// current one.
+    static func phraseStart(
+        before time: Double,
+        beatTimes: [Double],
+        anchor: Double?,
+        phraseLength: Int
+    ) -> Double? {
+        let starts = phraseStartTimes(
+            beatTimes: beatTimes,
+            anchor: anchor,
+            phraseLength: phraseLength
+        )
+        let threshold = time - rewindGraceSeconds
+        if let restart = starts.last(where: { $0 <= threshold }) {
+            return restart
+        }
+        return starts.last { $0 < time } ?? starts.first
+    }
+
+    /// Start and end of the phrase containing `time`, for looping it.
+    ///
+    /// The end is the next phrase start, so consecutive loops butt up
+    /// against each other with no gap or overlap. Falls back to the final
+    /// beat when `time` sits in the last phrase.
+    static func currentPhraseBounds(
+        at time: Double,
+        beatTimes: [Double],
+        anchor: Double?,
+        phraseLength: Int
+    ) -> (start: Double, end: Double)? {
+        let starts = phraseStartTimes(
+            beatTimes: beatTimes,
+            anchor: anchor,
+            phraseLength: phraseLength
+        )
+        guard let start = starts.last(where: { $0 <= time }) ?? starts.first else { return nil }
+        let end = starts.first { $0 > start } ?? beatTimes.last
+        guard let end, end > start else { return nil }
+        return (start, end)
+    }
+
+    /// Moves an anchor `byBeats` along the grid, for nudging a guessed
+    /// downbeat onto the real one. Clamped to the grid, so holding the
+    /// button down can't walk the anchor off either end.
+    static func shiftAnchor(
+        _ anchor: Double,
+        byBeats: Int,
+        in beatTimes: [Double]
+    ) -> Double? {
+        guard !beatTimes.isEmpty,
+              let index = BeatGrid.nearestBeatIndex(to: anchor, in: beatTimes) else {
+            return nil
+        }
+        let shifted = min(max(0, index + byBeats), beatTimes.count - 1)
+        return beatTimes[shifted]
+    }
+}

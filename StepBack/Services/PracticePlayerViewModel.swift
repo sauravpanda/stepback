@@ -33,9 +33,14 @@ final class PracticePlayerViewModel: ObservableObject {
     // nonisolated(unsafe) rather than dragged through MainActor.
     private nonisolated(unsafe) var timeObserver: Any?
     private nonisolated(unsafe) var beatBoundaryObserver: Any?
+    private nonisolated(unsafe) var endOfItemObserver: NSObjectProtocol?
     private var configuredBeatTimes: [Double] = []
     private var configuredDownbeatIndices: Set<Int> = []
     private var playerItem: AVPlayerItem?
+    /// The resolved source, kept so the played item can be rebuilt — e.g.
+    /// re-composed with a metronome click — without resolving the Photos
+    /// asset a second time. See `rebuildItem(transform:)`.
+    private var sourceAsset: AVURLAsset?
 
     /// Increments every time the player crosses a beat boundary. UI binds to
     /// this rather than `currentTime` so the pulse animation only re-renders
@@ -69,114 +74,18 @@ final class PracticePlayerViewModel: ObservableObject {
         self.player = player
         self.onLocalIdentifierRemapped = onLocalIdentifierRemapped
         attachTimeObserver()
+        attachEndOfItemObserver()
     }
 
     deinit {
+        if let endOfItemObserver {
+            NotificationCenter.default.removeObserver(endOfItemObserver)
+        }
         if let timeObserver {
             player.removeTimeObserver(timeObserver)
         }
         if let beatBoundaryObserver {
             player.removeTimeObserver(beatBoundaryObserver)
-        }
-    }
-
-    // MARK: - Beat pulse
-
-    /// Registers boundary-time observers at every entry in `beatTimes`.
-    /// AVPlayer fires the callback when playback crosses each timestamp,
-    /// which is more accurate (and cheaper) than checking against
-    /// `currentTime` from the periodic observer. Idempotent — calling again
-    /// tears down the previous observer first, so it's safe to invoke when
-    /// beats are re-detected.
-    func configureBeatPulse(beatTimes: [Double], downbeatIndices: Set<Int>) {
-        if let beatBoundaryObserver {
-            player.removeTimeObserver(beatBoundaryObserver)
-            self.beatBoundaryObserver = nil
-        }
-        configuredBeatTimes = beatTimes
-        configuredDownbeatIndices = downbeatIndices
-        guard !beatTimes.isEmpty else { return }
-
-        let nsValues = beatTimes.map {
-            NSValue(time: CMTime(seconds: $0, preferredTimescale: 600))
-        }
-        beatBoundaryObserver = player.addBoundaryTimeObserver(
-            forTimes: nsValues,
-            queue: .main
-        ) { [weak self] in
-            // queue: .main → safe to assume MainActor.
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                let now = self.player.currentTime().seconds
-                // The boundary that fired is the latest beat time at or
-                // before `now` (with a small slack for timer jitter).
-                let index = self.configuredBeatTimes.lastIndex { $0 <= now + 0.05 }
-                    ?? 0
-                self.lastBeatWasDownbeat = self.configuredDownbeatIndices.contains(index)
-                self.beatPulseID &+= 1
-            }
-        }
-    }
-
-    // MARK: - Now Playing
-
-    func enableNowPlaying(for clip: DanceClip) {
-        let controller = NowPlayingController(player: player, clip: clip)
-        controller.activate()
-        nowPlaying = controller
-    }
-
-    func disableNowPlaying() {
-        nowPlaying?.deactivate()
-        nowPlaying = nil
-    }
-
-    // MARK: - Loading
-
-    /// Swaps the underlying source (e.g. after a trim writes a new file) and
-    /// reloads. Resets transport state so the user doesn't end up paused at
-    /// a timestamp that no longer exists in the new timeline.
-    func reloadAsset(localFileURL: URL?) async {
-        self.localFileURL = localFileURL
-        pause()
-        loopStart = nil
-        loopEnd = nil
-        activeSegmentID = nil
-        currentTime = 0
-        duration = 0
-        isReady = false
-        loadError = nil
-        player.replaceCurrentItem(with: nil)
-        playerItem = nil
-        await load()
-    }
-
-    func load() async {
-        guard !isReady else { return }
-        do {
-            let urlAsset: AVURLAsset
-            if let localFileURL {
-                urlAsset = AVURLAsset(url: localFileURL)
-            } else {
-                let resolved = try await photosService.resolveAVAsset(
-                    localIdentifier: assetIdentifier,
-                    cloudIdentifier: cloudIdentifier
-                )
-                urlAsset = resolved.asset
-                if let healed = resolved.remappedLocalIdentifier {
-                    assetIdentifier = healed
-                    onLocalIdentifierRemapped?(healed)
-                }
-            }
-            let loadedDuration = try await urlAsset.load(.duration).seconds
-            let item = AVPlayerItem(asset: urlAsset)
-            item.audioTimePitchAlgorithm = .timeDomain
-            player.replaceCurrentItem(with: item)
-            playerItem = item
-            duration = loadedDuration.isFinite ? loadedDuration : 0
-            isReady = true
-        } catch {
-            loadError = error.localizedDescription
         }
     }
 
@@ -263,6 +172,12 @@ final class PracticePlayerViewModel: ObservableObject {
             let analysis = try await BeatDetector.analyze(asset: asset)
             clip.bpm = analysis.bpm
             clip.setBeatTimes(analysis.beatTimes)
+            // Seed the anchor from the detector's guess so the count starts
+            // on its own. Only when there isn't one already — a downbeat the
+            // user placed by hand always outranks the estimate.
+            if clip.firstDownbeatSeconds == nil {
+                clip.firstDownbeatSeconds = analysis.downbeatSeconds
+            }
             isAnalyzingBeats = false
             onSave()
         } catch {
@@ -447,5 +362,190 @@ extension PracticePlayerViewModel {
         let seconds = player.currentTime().seconds
         guard seconds.isFinite else { return currentTime }
         return max(0, min(seconds, duration))
+    }
+}
+
+// MARK: - Item rebuilding and direct loop control
+
+extension PracticePlayerViewModel {
+
+    /// Rebuilds the played item from the already-resolved source, optionally
+    /// transforming it first, and restores position and play state.
+    ///
+    /// The Listen tab uses this to fold a metronome click into the audio.
+    /// Going back through `load()` would re-resolve the Photos asset and
+    /// drop the user's place in the track; this keeps both.
+    func rebuildItem(
+        transform: ((AVURLAsset) async throws -> AVAsset)? = nil
+    ) async {
+        guard let sourceAsset else { return }
+        let resumeAt = precisePlaybackTime
+        let wasPlaying = isPlaying
+        pause()
+        do {
+            let playable: AVAsset = try await transform?(sourceAsset) ?? sourceAsset
+            let item = AVPlayerItem(asset: playable)
+            item.audioTimePitchAlgorithm = .timeDomain
+            player.replaceCurrentItem(with: item)
+            playerItem = item
+            seek(to: resumeAt)
+            if wasPlaying {
+                play()
+            }
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    /// Sets both loop markers at once.
+    ///
+    /// `markLoopStart` / `markLoopEnd` read the playhead, which is right for
+    /// the Practice tab's hand-placed A/B loops but wrong for looping a
+    /// phrase, where both bounds come from the beat grid rather than from
+    /// where the user happened to be.
+    func setLoop(start: Double, end: Double) {
+        guard end > start else { return }
+        loopStart = start
+        loopEnd = end
+        activeSegmentID = nil
+    }
+}
+
+// MARK: - Beat pulse, Now Playing, loading
+
+/// Moved out of the class body to bring it back under SwiftLint's
+/// `type_body_length` limit, which it had already exceeded. These are
+/// ordinary members — `private` is file-scoped, so they still reach the
+/// stored properties above.
+extension PracticePlayerViewModel {
+
+    // MARK: - Beat pulse
+
+    /// Registers boundary-time observers at every entry in `beatTimes`.
+    /// AVPlayer fires the callback when playback crosses each timestamp,
+    /// which is more accurate (and cheaper) than checking against
+    /// `currentTime` from the periodic observer. Idempotent — calling again
+    /// tears down the previous observer first, so it's safe to invoke when
+    /// beats are re-detected.
+    func configureBeatPulse(beatTimes: [Double], downbeatIndices: Set<Int>) {
+        if let beatBoundaryObserver {
+            player.removeTimeObserver(beatBoundaryObserver)
+            self.beatBoundaryObserver = nil
+        }
+        configuredBeatTimes = beatTimes
+        configuredDownbeatIndices = downbeatIndices
+        guard !beatTimes.isEmpty else { return }
+
+        let nsValues = beatTimes.map {
+            NSValue(time: CMTime(seconds: $0, preferredTimescale: 600))
+        }
+        beatBoundaryObserver = player.addBoundaryTimeObserver(
+            forTimes: nsValues,
+            queue: .main
+        ) { [weak self] in
+            // queue: .main → safe to assume MainActor.
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let now = self.player.currentTime().seconds
+                // The boundary that fired is the latest beat time at or
+                // before `now` (with a small slack for timer jitter).
+                let index = self.configuredBeatTimes.lastIndex { $0 <= now + 0.05 }
+                    ?? 0
+                self.lastBeatWasDownbeat = self.configuredDownbeatIndices.contains(index)
+                self.beatPulseID &+= 1
+            }
+        }
+    }
+
+    // MARK: - Now Playing
+
+    func enableNowPlaying(for clip: DanceClip) {
+        let controller = NowPlayingController(player: player, clip: clip)
+        controller.activate()
+        nowPlaying = controller
+    }
+
+    func disableNowPlaying() {
+        nowPlaying?.deactivate()
+        nowPlaying = nil
+    }
+
+    // MARK: - Loading
+
+    /// Swaps the underlying source (e.g. after a trim writes a new file) and
+    /// reloads. Resets transport state so the user doesn't end up paused at
+    /// a timestamp that no longer exists in the new timeline.
+    func reloadAsset(localFileURL: URL?) async {
+        self.localFileURL = localFileURL
+        pause()
+        loopStart = nil
+        loopEnd = nil
+        activeSegmentID = nil
+        currentTime = 0
+        duration = 0
+        isReady = false
+        loadError = nil
+        player.replaceCurrentItem(with: nil)
+        playerItem = nil
+        await load()
+    }
+
+    func load() async {
+        guard !isReady else { return }
+        do {
+            let urlAsset: AVURLAsset
+            if let localFileURL {
+                urlAsset = AVURLAsset(url: localFileURL)
+            } else {
+                let resolved = try await photosService.resolveAVAsset(
+                    localIdentifier: assetIdentifier,
+                    cloudIdentifier: cloudIdentifier
+                )
+                urlAsset = resolved.asset
+                if let healed = resolved.remappedLocalIdentifier {
+                    assetIdentifier = healed
+                    onLocalIdentifierRemapped?(healed)
+                }
+            }
+            sourceAsset = urlAsset
+            let loadedDuration = try await urlAsset.load(.duration).seconds
+            let item = AVPlayerItem(asset: urlAsset)
+            item.audioTimePitchAlgorithm = .timeDomain
+            player.replaceCurrentItem(with: item)
+            playerItem = item
+            duration = loadedDuration.isFinite ? loadedDuration : 0
+            isReady = true
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - End of playback
+
+private extension PracticePlayerViewModel {
+
+    /// Clears `isPlaying` when the item runs out.
+    ///
+    /// AVPlayer stops at the end but publishes nothing this class was
+    /// listening for, so the transport went on showing a pause button over a
+    /// stopped player. Observed with a nil object and filtered by identity so
+    /// the subscription survives `replaceCurrentItem` — the Listen tab swaps
+    /// the item whenever the metronome is toggled.
+    func attachEndOfItemObserver() {
+        endOfItemObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            // queue: .main → safe to assume MainActor.
+            MainActor.assumeIsolated {
+                guard let self,
+                      let finished = note.object as? AVPlayerItem,
+                      finished === self.player.currentItem else { return }
+                self.isPlaying = false
+                self.nowPlaying?.updateInfo()
+            }
+        }
     }
 }
