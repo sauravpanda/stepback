@@ -6,6 +6,17 @@ enum MetronomeError: Error, Equatable {
     case renderFailed
 }
 
+/// A composed click mix plus the scratch file backing it.
+///
+/// The URL comes back with the asset because the caller has to keep the
+/// file alive for exactly as long as the asset plays, then delete it. A
+/// click track for a three-minute song is ~30MB, so leaving them to
+/// accumulate fills the temp directory fast.
+struct ComposedClickTrack {
+    let asset: AVAsset
+    let fileURL: URL
+}
+
 /// Mixes an audible click onto a clip's audio, locked to its beat grid.
 ///
 /// The click is **composed into the playable asset** rather than triggered
@@ -88,7 +99,7 @@ enum MetronomeMixer {
         beatTimes: [Double],
         downbeatIndices: Set<Int>,
         subdivisionIndices: Set<Int> = []
-    ) async throws -> AVAsset {
+    ) async throws -> ComposedClickTrack {
         let audioTracks = try await source.loadTracks(withMediaType: .audio)
         guard let sourceAudio = audioTracks.first else {
             throw MetronomeError.noAudioTrack
@@ -127,7 +138,17 @@ enum MetronomeMixer {
             of: clickSource,
             at: .zero
         )
-        return composition
+        return ComposedClickTrack(asset: composition, fileURL: clickURL)
+    }
+
+    /// Deletes a scratch click track once nothing is playing it.
+    ///
+    /// Best-effort: a file that is already gone, or that the player still
+    /// holds open, is not worth surfacing as an error to someone who just
+    /// wanted a metronome.
+    static func discardClickTrack(at url: URL?) {
+        guard let url else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 
     /// Writes the click track to a temporary `.caf` so AVFoundation can
