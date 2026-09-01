@@ -67,6 +67,7 @@ struct ListeningPlayerView: View {
                 )
                 .frame(maxWidth: .infinity)
                 chips
+                playbackSettings
                 AnchorNudgeBar(
                     hasAnchor: clip.firstDownbeatSeconds != nil,
                     onShift: shiftAnchor,
@@ -212,10 +213,19 @@ struct ListeningPlayerView: View {
                 action: { drillsShown.toggle() }
             )
             Spacer()
+        }
+    }
+
+    /// How it plays and how it counts, kept on their own line: the three
+    /// mode chips above already fill the width on a narrow phone.
+    private var playbackSettings: some View {
+        HStack(spacing: 8) {
+            SpeedMenuButton(selected: vm.speed, onSelect: vm.setSpeed)
             SubdivisionMenu(selection: subdivision) { picked in
                 subdivisionRaw = picked.rawValue
                 Task { await refreshClickTrackIfOn() }
             }
+            Spacer()
         }
     }
 
