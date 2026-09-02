@@ -62,6 +62,18 @@ struct PracticeView: View {
             // and ergonomic next to the title.
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 12) {
+                    // Favourite lives here as well as in the Library: the
+                    // moment you know a clip is worth coming back to is
+                    // while you're practising it.
+                    Button {
+                        clip.isFavorite.toggle()
+                        try? modelContext.save()
+                    } label: {
+                        Image(systemName: clip.isFavorite ? "heart.fill" : "heart")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(clip.isFavorite ? Theme.Color.accent : Theme.Color.textPrimary)
+                    }
+                    .accessibilityLabel(clip.isFavorite ? "Remove from Favorites" : "Favorite")
                     Button {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                             controlsHidden.toggle()

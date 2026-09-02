@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-// These live models are the V2 schema shape (see Schema.swift). CloudKit
+// These live models are the V3 schema shape (see Schema.swift). CloudKit
 // sync imposes three rules on every model here: no unique constraints,
 // every attribute optional or defaulted, every relationship optional.
 // The optional relationship arrays sit behind non-optional computed
@@ -17,6 +17,11 @@ final class DanceClip: Equatable, Hashable {
     var notes: String = ""
     var thumbnailData: Data?
     var durationSeconds: Double = 0
+
+    /// Starred by the user for the Library's Favorites collection. A
+    /// defaulted `Bool` rather than an optional so CloudKit accepts it and
+    /// every row that predates it simply reads as "not yet".
+    var isFavorite: Bool = false
 
     // Beat analysis, populated once by BeatDetector and cached in the store.
     var bpm: Double?

@@ -118,7 +118,7 @@ enum SchemaV1: VersionedSchema {
     }
 }
 
-/// V2 — the current live models in `Models.swift`. Three changes from V1:
+/// V2 — frozen below. Three changes from V1:
 ///
 /// 1. `DanceClip.cloudAssetIdentifier` (new, optional) stores the
 ///    `PHCloudIdentifier` so stale local Photos identifiers can be healed.
@@ -131,26 +131,125 @@ enum SchemaV2: VersionedSchema {
     static let versionIdentifier: Schema.Version = .init(2, 0, 0)
 
     static var models: [any PersistentModel.Type] {
+        [SchemaV2.DanceClip.self, SchemaV2.Tag.self, SchemaV2.ClipSegment.self]
+    }
+
+    // Frozen copies of the V2 shape — `Models.swift` as it stood before
+    // `isFavorite` — kept faithful down to the `originalName` renames, which
+    // are part of how the store lines these entities up with V1's.
+
+    @Model
+    final class DanceClip {
+        var id: UUID = UUID()
+        var title: String = ""
+        var assetIdentifier: String = ""
+        var dateAdded: Date = Date()
+        var eventName: String?
+        var notes: String = ""
+        var thumbnailData: Data?
+        var durationSeconds: Double = 0
+
+        var bpm: Double?
+        var beatTimesData: Data?
+        var firstDownbeatSeconds: Double?
+        var beatsPerMeasure: Int = 4
+
+        var trimmedFileName: String?
+        var originalFileName: String?
+        var cloudAssetIdentifier: String?
+
+        @Relationship(deleteRule: .cascade, originalName: "segments", inverse: \SchemaV2.ClipSegment.clip)
+        var segmentsStorage: [SchemaV2.ClipSegment]?
+
+        @Relationship(originalName: "tags")
+        var tagsStorage: [SchemaV2.Tag]?
+
+        init(id: UUID = UUID(), title: String, assetIdentifier: String) {
+            self.id = id
+            self.title = title
+            self.assetIdentifier = assetIdentifier
+        }
+    }
+
+    @Model
+    final class Tag {
+        var id: UUID = UUID()
+        var name: String = ""
+        var colorHex: String = ""
+
+        @Relationship(originalName: "clips", inverse: \SchemaV2.DanceClip.tagsStorage)
+        var clipsStorage: [SchemaV2.DanceClip]?
+
+        init(id: UUID = UUID(), name: String, colorHex: String) {
+            self.id = id
+            self.name = name
+            self.colorHex = colorHex
+        }
+    }
+
+    @Model
+    final class ClipSegment {
+        var id: UUID = UUID()
+        var title: String = ""
+        var startSeconds: Double = 0
+        var endSeconds: Double = 0
+        var preferredSpeed: Double = 1.0
+        var notes: String = ""
+        var dateAdded: Date = Date()
+        var orderIndex: Int = 0
+        var thumbnailData: Data?
+        var clip: SchemaV2.DanceClip?
+
+        init(
+            id: UUID = UUID(),
+            title: String,
+            startSeconds: Double,
+            endSeconds: Double,
+            clip: SchemaV2.DanceClip? = nil
+        ) {
+            self.id = id
+            self.title = title
+            self.startSeconds = startSeconds
+            self.endSeconds = endSeconds
+            self.clip = clip
+        }
+    }
+}
+
+/// V3 — the current live models in `Models.swift`. One change from V2:
+/// `DanceClip.isFavorite`, a `Bool` defaulting to false, behind the
+/// Library's Favorites collection. Defaulted rather than optional so
+/// CloudKit is happy and every existing row reads as "not yet".
+enum SchemaV3: VersionedSchema {
+    static let versionIdentifier: Schema.Version = .init(3, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
         [DanceClip.self, Tag.self, ClipSegment.self]
     }
 }
 
 /// SwiftData migration plan for StepBack.
 ///
-/// V1 → V2 is lightweight: additive optional column, relationship renames
-/// declared through `originalName`, and optionality loosening — nothing
-/// that needs a custom stage.
+/// Both stages are lightweight. V1 → V2: additive optional column,
+/// relationship renames declared through `originalName`, optionality
+/// loosening. V2 → V3: one additive defaulted column. Nothing that needs a
+/// custom stage.
 enum StepBackMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [SchemaV1.self, SchemaV2.self]
+        [SchemaV1.self, SchemaV2.self, SchemaV3.self]
     }
 
     static var stages: [MigrationStage] {
-        [migrateV1toV2]
+        [migrateV1toV2, migrateV2toV3]
     }
 
     static let migrateV1toV2 = MigrationStage.lightweight(
         fromVersion: SchemaV1.self,
         toVersion: SchemaV2.self
+    )
+
+    static let migrateV2toV3 = MigrationStage.lightweight(
+        fromVersion: SchemaV2.self,
+        toVersion: SchemaV3.self
     )
 }
