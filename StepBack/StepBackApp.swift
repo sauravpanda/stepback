@@ -17,7 +17,9 @@ struct StepBackApp: App {
             try? AVAudioSession.sharedInstance().setActive(true)
         }
 
-        let schema = Schema(versionedSchema: SchemaV2.self)
+        Self.ensureStoreDirectoryExists()
+
+        let schema = Schema(versionedSchema: SchemaV3.self)
         do {
             // `cloudKitDatabase: .automatic` — syncs through the app's iCloud
             // container when the entitlement is present (paid developer
@@ -54,5 +56,19 @@ struct StepBackApp: App {
             RootView()
         }
         .modelContainer(container)
+    }
+
+    /// SwiftData keeps its store at `Library/Application Support/default.store`,
+    /// and on a fresh install that folder does not exist. CoreData copes —
+    /// it fails to create the file, logs a diagnostic of every directory up
+    /// to `/` ("Sandbox access to file-write-create denied", errno 2), then
+    /// makes the folder and retries successfully — but several hundred lines
+    /// of that on first launch read like a broken install. Creating the
+    /// folder first skips the whole detour.
+    private static func ensureStoreDirectoryExists() {
+        guard let directory = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        ).first else { return }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 }
