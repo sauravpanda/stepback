@@ -39,6 +39,7 @@
 		6BEA9ED6D92F4B26B85BFA21 /* PoseDetectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D718DA7FBF3C3F0248929A7 /* PoseDetectionService.swift */; };
 		6D07B2B8C0984255BDC28E27 /* ListeningUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABA653C043E2599A2530242B /* ListeningUI.swift */; };
 		72A012D3DCF8FA13D69C1868 /* KeepScreenAwake.swift in Sources */ = {isa = PBXBuildFile; fileRef = E56B6CE778D3BD0C5B1B248B /* KeepScreenAwake.swift */; };
+		72A73C7DBEDDD5C1428AB0AF /* LibrarySummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F362530E1A26E6E71102FB /* LibrarySummaryTests.swift */; };
 		76D520F6EC5A0A8E57C8AAA1 /* BeatDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BC077A9FA8B51D07C178A0 /* BeatDetectorTests.swift */; };
 		782B609F039BD291571F9CB2 /* PoseCoordinateTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75D7B3643B17B81DF4B8A3D8 /* PoseCoordinateTransform.swift */; };
 		7E9F26254C5E9A21813940B6 /* ListeningExerciseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3689FBA12EEC8A3CCA08789F /* ListeningExerciseTests.swift */; };
@@ -52,6 +53,7 @@
 		9799CACB6C924AC1940D9FE3 /* StepBackMigrationPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808127290713ACE9855DA35E /* StepBackMigrationPlanTests.swift */; };
 		9955BF32B7DB538849A77F77 /* WeightStackingEvaluatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 562F2A8FB404F08A50DABD0B /* WeightStackingEvaluatorTests.swift */; };
 		9DCAAD9B2DCFAEE83A9D4879 /* TrimView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF9D9B68E730BA51C86D70A /* TrimView.swift */; };
+		9E566F49544DD767E0A58804 /* LibraryCollectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBF51BD84914CF2B71DFF381 /* LibraryCollectionTests.swift */; };
 		9F90D5641396A9BF3E7A09FE /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E94F050959741028A8574D /* RootView.swift */; };
 		A126D36EEB2C8B0AAD6996F4 /* CountSubdivision.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6171CE5BF626FBE8671A0874 /* CountSubdivision.swift */; };
 		A1FC47556C7F388415D1174C /* PlayerScrubber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 038DE434ABF6CB1403A34F10 /* PlayerScrubber.swift */; };
@@ -78,6 +80,7 @@
 		D59006BDF41C10B002F97FE8 /* PoseOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08505D0FA11E6637197AF8EC /* PoseOverlay.swift */; };
 		D79917C68C6C2663D424A189 /* PhraseAnchorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1A01187B2771C3642479B6 /* PhraseAnchorTests.swift */; };
 		D8739042EECB4AE2C7804C41 /* OriginalImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D1395E84111ADD80CC22565 /* OriginalImportService.swift */; };
+		D8CA3948660E56A0B6F5014B /* LibraryCollectionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 646B79AFE3D853E8CD3B075B /* LibraryCollectionBar.swift */; };
 		D9873262DD68100D8D3C1021 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 462E264B215595E9EC3D1C4A /* Assets.xcassets */; };
 		D9AC9EB80E5FBEC30A1AB5B3 /* PoseOrientationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 284F5B49794793B83D590351 /* PoseOrientationTests.swift */; };
 		DA0EE94353A18DA75824D7A8 /* BeatGridTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7093A077C0A2C139BD7BDD29 /* BeatGridTests.swift */; };
@@ -85,6 +88,7 @@
 		E9E06DF791FF47015B3DDFA8 /* BeatDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C59BD8F65AE46261EEFD4F69 /* BeatDetector.swift */; };
 		ED3E826645A88F1EA36A182D /* OneEuroFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75FE50463A4FCC200646F955 /* OneEuroFilter.swift */; };
 		F35848C14CA3DF06A4EBE554 /* SpeedFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16E676751B59ED083837CE39 /* SpeedFormatterTests.swift */; };
+		F58E19E68A7F1A125A161C7A /* LibrarySummaryBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB5E8FA26D85855DF127E90C /* LibrarySummaryBar.swift */; };
 		F7AD3FACE8B875F1C9DFA310 /* PhotosService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8F8476EAB523378C1F1E046 /* PhotosService.swift */; };
 		FD9F3EEB30E4080165D26B5A /* BeatDetectorPhraseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47E1C9AD49F4D12FB2C708BB /* BeatDetectorPhraseTests.swift */; };
 		FF149265E884C202BEF590BE /* PoseCoordinateTransformTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED02929698766149F5A683B1 /* PoseCoordinateTransformTests.swift */; };
@@ -131,7 +135,9 @@
 		56E94F050959741028A8574D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		57317F752B65258CB2D04530 /* LoopEvaluatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopEvaluatorTests.swift; sourceTree = "<group>"; };
 		5D718DA7FBF3C3F0248929A7 /* PoseDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoseDetectionService.swift; sourceTree = "<group>"; };
+		60F362530E1A26E6E71102FB /* LibrarySummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySummaryTests.swift; sourceTree = "<group>"; };
 		6171CE5BF626FBE8671A0874 /* CountSubdivision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountSubdivision.swift; sourceTree = "<group>"; };
+		646B79AFE3D853E8CD3B075B /* LibraryCollectionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCollectionBar.swift; sourceTree = "<group>"; };
 		6745FF48B10D28A5ED4BB568 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		69B7BD8FC0EB83548655B998 /* MetronomeMixerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetronomeMixerTests.swift; sourceTree = "<group>"; };
 		6A461B2E1B96D002ABA96F7B /* PhraseGridTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhraseGridTests.swift; sourceTree = "<group>"; };
@@ -164,6 +170,8 @@
 		B5505E62D217CB6AA3579A6D /* PhotosServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosServiceTests.swift; sourceTree = "<group>"; };
 		B7C112AEA59633E85CF8267D /* ThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeTests.swift; sourceTree = "<group>"; };
 		B7CA903EF426C5859033A9B7 /* ListeningDrillStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningDrillStateTests.swift; sourceTree = "<group>"; };
+		BB5E8FA26D85855DF127E90C /* LibrarySummaryBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySummaryBar.swift; sourceTree = "<group>"; };
+		BBF51BD84914CF2B71DFF381 /* LibraryCollectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCollectionTests.swift; sourceTree = "<group>"; };
 		C202F115AC1B555B74DF9EB6 /* PhraseGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhraseGrid.swift; sourceTree = "<group>"; };
 		C35987D9825155E131A40950 /* PracticeControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeControls.swift; sourceTree = "<group>"; };
 		C59BD8F65AE46261EEFD4F69 /* BeatDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatDetector.swift; sourceTree = "<group>"; };
@@ -211,6 +219,8 @@
 			children = (
 				8D25E6771271EDD5B867F61E /* ClipEditView.swift */,
 				89049437E63D50C5452D5760 /* DrillUI.swift */,
+				646B79AFE3D853E8CD3B075B /* LibraryCollectionBar.swift */,
+				BB5E8FA26D85855DF127E90C /* LibrarySummaryBar.swift */,
 				AAB30650146433E889DC2AF4 /* LibraryView.swift */,
 				87BD8CD6749EE6D846064C4F /* ListeningPlayerView.swift */,
 				ABA653C043E2599A2530242B /* ListeningUI.swift */,
@@ -238,7 +248,9 @@
 				7093A077C0A2C139BD7BDD29 /* BeatGridTests.swift */,
 				092716ED66E68AFE39612D8E /* BeatTrackerTests.swift */,
 				2AE253F68F99B73CECC1093C /* CountSubdivisionTests.swift */,
+				BBF51BD84914CF2B71DFF381 /* LibraryCollectionTests.swift */,
 				8B4B3FD6B0A004C787FC243B /* LibraryFormatterTests.swift */,
+				60F362530E1A26E6E71102FB /* LibrarySummaryTests.swift */,
 				E7F39755A293A876AC2DB98A /* ListeningDrillPlanTests.swift */,
 				B7CA903EF426C5859033A9B7 /* ListeningDrillStateTests.swift */,
 				3689FBA12EEC8A3CCA08789F /* ListeningExerciseTests.swift */,
@@ -439,6 +451,8 @@
 				A126D36EEB2C8B0AAD6996F4 /* CountSubdivision.swift in Sources */,
 				0D668E2C856C00A5C8806A23 /* DrillUI.swift in Sources */,
 				72A012D3DCF8FA13D69C1868 /* KeepScreenAwake.swift in Sources */,
+				D8CA3948660E56A0B6F5014B /* LibraryCollectionBar.swift in Sources */,
+				F58E19E68A7F1A125A161C7A /* LibrarySummaryBar.swift in Sources */,
 				A88000A1ACD9503F7A9D6143 /* LibraryView.swift in Sources */,
 				A6B0224046591AE32D010991 /* ListenView.swift in Sources */,
 				00216C193FEECCCE9300D9F2 /* ListeningDrillPlan.swift in Sources */,
@@ -491,7 +505,9 @@
 				DA0EE94353A18DA75824D7A8 /* BeatGridTests.swift in Sources */,
 				256483E74779AD1F7B19E927 /* BeatTrackerTests.swift in Sources */,
 				57DC3A5B49F0B0B6E6AB27E4 /* CountSubdivisionTests.swift in Sources */,
+				9E566F49544DD767E0A58804 /* LibraryCollectionTests.swift in Sources */,
 				5F405BD1B2F2EB7F30970683 /* LibraryFormatterTests.swift in Sources */,
+				72A73C7DBEDDD5C1428AB0AF /* LibrarySummaryTests.swift in Sources */,
 				39A4222D342C2474DE3B46FF /* ListeningDrillPlanTests.swift in Sources */,
 				0D16A4ECF9075D8853C9E93A /* ListeningDrillStateTests.swift in Sources */,
 				7E9F26254C5E9A21813940B6 /* ListeningExerciseTests.swift in Sources */,

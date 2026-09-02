@@ -13,7 +13,7 @@ struct LibraryView: View {
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var importState: ImportState = .idle
     @State private var importError: String?
-    @State private var selectedTagIDs: Set<UUID> = []
+    @State private var collection: LibraryCollection = .all
 
     @State private var editingClip: DanceClip?
     @State private var isSelecting: Bool = false
@@ -97,10 +97,7 @@ struct LibraryView: View {
     // MARK: - Content
 
     private var filteredClips: [DanceClip] {
-        guard !selectedTagIDs.isEmpty else { return clips }
-        return clips.filter { clip in
-            clip.tags.contains { selectedTagIDs.contains($0.id) }
-        }
+        clips.filter(collection.contains)
     }
 
     @ViewBuilder
@@ -109,22 +106,19 @@ struct LibraryView: View {
             emptyState
         } else {
             VStack(spacing: 0) {
-                if !tags.isEmpty {
-                    TagFilterBar(
-                        tags: tags,
-                        selected: $selectedTagIDs,
-                        countFor: { tag in
-                            clips.filter { $0.tags.contains(where: { $0.id == tag.id }) }.count
-                        }
-                    )
-                }
+                LibraryCollectionBar(albums: tags, clips: clips, selected: $collection)
+                LibrarySummaryBar(shown: filteredClips, total: clips.count)
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(filteredClips) { clip in
-                            clipCell(for: clip)
+                    if filteredClips.isEmpty, let hint = collection.emptyHint {
+                        LibraryCollectionEmptyState(hint: hint)
+                    } else {
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(filteredClips) { clip in
+                                clipCell(for: clip)
+                            }
                         }
+                        .padding(12)
                     }
-                    .padding(12)
                 }
                 if isSelecting {
                     bulkActionBar
@@ -156,7 +150,8 @@ struct LibraryView: View {
                     clip: clip,
                     selectionState: .hidden,
                     onEdit: { editingClip = clip },
-                    onDelete: { deleteConfirmation = .single(clip) }
+                    onDelete: { deleteConfirmation = .single(clip) },
+                    onToggleFavorite: { toggleFavorite(clip) }
                 )
             }
             .buttonStyle(.plain)
@@ -249,6 +244,11 @@ struct LibraryView: View {
                 }
             }
         }
+    }
+
+    private func toggleFavorite(_ clip: DanceClip) {
+        clip.isFavorite.toggle()
+        try? modelContext.save()
     }
 
     private func enterSelectionMode() {
@@ -461,6 +461,7 @@ private struct LibraryCell: View {
     var selectionState: CellSelectionState = .hidden
     var onEdit: (() -> Void)?
     var onDelete: (() -> Void)?
+    var onToggleFavorite: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -474,8 +475,13 @@ private struct LibraryCell: View {
                     HStack(alignment: .top) {
                         if selectionState != .hidden {
                             selectionIndicator
-                        } else if clip.segments.count > 0 {
-                            patternsBadge
+                        } else {
+                            if clip.isFavorite {
+                                favoriteBadge
+                            }
+                            if !clip.segments.isEmpty {
+                                patternsBadge
+                            }
                         }
                         Spacer()
                         if selectionState == .hidden, onEdit != nil || onDelete != nil {
@@ -558,6 +564,17 @@ private struct LibraryCell: View {
         .accessibilityLabel("\(clip.segments.count) pattern\(clip.segments.count == 1 ? "" : "s")")
     }
 
+    /// Top-left heart on a favourited clip. The menu is where you *make* a
+    /// favourite; this is how you can tell at a glance that you did.
+    private var favoriteBadge: some View {
+        Image(systemName: "heart.fill")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(Theme.Color.accent)
+            .frame(width: 22, height: 22)
+            .background(Color.black.opacity(0.55), in: Circle())
+            .accessibilityLabel("Favorite")
+    }
+
     private var selectionIndicator: some View {
         Image(systemName: selectionState == .selected ? "checkmark.circle.fill" : "circle")
             .font(.system(size: 22))
@@ -567,6 +584,16 @@ private struct LibraryCell: View {
 
     private var menuButton: some View {
         Menu {
+            if let onToggleFavorite {
+                Button {
+                    onToggleFavorite()
+                } label: {
+                    Label(
+                        clip.isFavorite ? "Remove from Favorites" : "Favorite",
+                        systemImage: clip.isFavorite ? "heart.slash" : "heart"
+                    )
+                }
+            }
             if let onEdit {
                 Button {
                     onEdit()
@@ -602,53 +629,6 @@ private struct LibraryCell: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
         .background(Color.black.opacity(0.55), in: Capsule())
-    }
-}
-
-// MARK: - Tag filter bar
-
-private struct TagFilterBar: View {
-    let tags: [Tag]
-    @Binding var selected: Set<UUID>
-    let countFor: (Tag) -> Int
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(tags) { tag in
-                    let isSelected = selected.contains(tag.id)
-                    let accent = Color(tagHex: tag.colorHex)
-                    Button {
-                        if isSelected {
-                            selected.remove(tag.id)
-                        } else {
-                            selected.insert(tag.id)
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(accent)
-                                .frame(width: 8, height: 8)
-                            Text(tag.name)
-                                .font(.system(.footnote, design: .rounded, weight: .semibold))
-                            Text("\(countFor(tag))")
-                                .font(.system(.footnote, design: .monospaced))
-                                .foregroundStyle(Theme.Color.textTertiary)
-                        }
-                        .foregroundStyle(isSelected ? .black : Theme.Color.textPrimary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule().fill(isSelected ? accent : Theme.Color.surfaceElevated)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-        }
-        .background(Theme.Color.background)
     }
 }
 

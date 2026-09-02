@@ -1,8 +1,8 @@
 import SwiftData
 import SwiftUI
 
-/// Edit a single clip: title, notes, and group (tag) membership. Also lets
-/// the user create a new group inline and assign it.
+/// Edit a single clip: title, notes, favourite flag, and album (tag)
+/// membership. Also lets the user create a new album inline and assign it.
 struct ClipEditView: View {
 
     @Bindable var clip: DanceClip
@@ -27,9 +27,16 @@ struct ClipEditView: View {
                         .lineLimit(3...8)
                 }
 
-                Section("Groups") {
+                Section {
+                    Toggle(isOn: $clip.isFavorite) {
+                        Label("Favorite", systemImage: "heart")
+                    }
+                    .tint(Theme.Color.accent)
+                }
+
+                Section("Albums") {
                     if allTags.isEmpty {
-                        Text("No groups yet. Create one below.")
+                        Text("No albums yet. Create one below.")
                             .font(Theme.Font.caption)
                             .foregroundStyle(Theme.Color.textTertiary)
                     } else {
@@ -39,7 +46,7 @@ struct ClipEditView: View {
                     }
 
                     HStack {
-                        TextField("New group name", text: $newGroupName)
+                        TextField("New album name", text: $newGroupName)
                             .focused($newGroupFocused)
                             .submitLabel(.done)
                             .onSubmit(addGroup)
@@ -127,7 +134,7 @@ struct ClipEditView: View {
     }
 }
 
-/// Sheet for moving multiple clips into one group at once.
+/// Sheet for moving multiple clips into one album at once.
 struct BulkMoveToGroupView: View {
 
     let clips: [DanceClip]
@@ -142,11 +149,11 @@ struct BulkMoveToGroupView: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Moving \(clips.count) clip\(clips.count == 1 ? "" : "s") into a group.")
+                    Text("Moving \(clips.count) clip\(clips.count == 1 ? "" : "s") into an album.")
                         .font(Theme.Font.caption)
                         .foregroundStyle(Theme.Color.textSecondary)
                 }
-                Section("Pick a group") {
+                Section("Pick an album") {
                     ForEach(allTags) { tag in
                         Button {
                             assignAll(to: tag)
@@ -166,9 +173,9 @@ struct BulkMoveToGroupView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                Section("Or create a new group") {
+                Section("Or create a new album") {
                     HStack {
-                        TextField("Group name", text: $newGroupName)
+                        TextField("Album name", text: $newGroupName)
                             .submitLabel(.done)
                             .onSubmit(createAndAssign)
                         Button("Create", action: createAndAssign)
@@ -180,7 +187,7 @@ struct BulkMoveToGroupView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.Color.background)
-            .navigationTitle("Move to group")
+            .navigationTitle("Move to album")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
