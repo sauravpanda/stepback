@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" role="img" aria-label="StepBack — rewind the video, catch the count">
+  <title>StepBack</title>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="72%">
+      <stop offset="0" stop-color="#1C1C29"/>
+      <stop offset="1" stop-color="#0A0A0F"/>
+    </radialGradient>
+    <filter id="glow" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <symbol id="mark" viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+      <circle cx="256" cy="256" r="176" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="3"/>
+      <g fill="#FFFFFF" fill-opacity="0.32">
+        <circle cx="380.5" cy="131.5" r="13"/>
+        <circle cx="432"   cy="256"   r="13"/>
+        <circle cx="380.5" cy="380.5" r="13"/>
+        <circle cx="256"   cy="432"   r="13" fill-opacity="0.6"/>
+        <circle cx="131.5" cy="380.5" r="13"/>
+        <circle cx="80"    cy="256"   r="13"/>
+        <circle cx="131.5" cy="131.5" r="13"/>
+      </g>
+      <circle cx="256" cy="80" r="30" fill="#FF3B7F" fill-opacity="0.6" filter="url(#glow)"/>
+      <circle cx="256" cy="80" r="22" fill="#FF3B7F"/>
+      <g fill="none" stroke-width="36" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="356,180 300,256 356,332" stroke="#FFFFFF" stroke-opacity="0.2"/>
+        <polyline points="284,180 228,256 284,332" stroke="#FFFFFF" stroke-opacity="0.85"/>
+        <polyline points="212,180 156,256 212,332" stroke="#FF3B7F"/>
+      </g>
+    </symbol>
+  </defs>
+
+  <rect width="1200" height="360" rx="48" fill="#0A0A0F"/>
+  <use href="#mark" x="44" y="40" width="280" height="280"/>
+
+  <g font-family="'SF Pro Rounded', 'SF Pro Display', -apple-system, 'Helvetica Neue', 'Arial Rounded MT Bold', Arial, sans-serif">
+    <text x="372" y="198" font-size="132" font-weight="800" letter-spacing="-4" fill="#FFFFFF">Step<tspan fill="#FF3B7F">Back</tspan></text>
+    <text x="378" y="262" font-size="30" font-weight="600" letter-spacing="3" fill="#FFFFFF" fill-opacity="0.55">REWIND THE VIDEO. CATCH THE COUNT.</text>
+  </g>
+</svg>

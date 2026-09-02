@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="StepBack">
+  <title>StepBack</title>
+  <desc>An 8-count ring with the 1 lit, and a step back through it: three chevrons, the lead one lit, the trail fading like a ghost frame.</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="72%">
+      <stop offset="0" stop-color="#1C1C29"/>
+      <stop offset="1" stop-color="#0A0A0F"/>
+    </radialGradient>
+    <filter id="glow" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+
+  <!-- The 8-count: one ring, eight beats, the 1 lit. The 5 a touch brighter,
+       because that's the other place a dancer's weight lands. -->
+  <circle cx="256" cy="256" r="176" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="3"/>
+  <g fill="#FFFFFF" fill-opacity="0.32">
+    <circle cx="380.5" cy="131.5" r="13"/>
+    <circle cx="432"   cy="256"   r="13"/>
+    <circle cx="380.5" cy="380.5" r="13"/>
+    <circle cx="256"   cy="432"   r="13" fill-opacity="0.6"/>
+    <circle cx="131.5" cy="380.5" r="13"/>
+    <circle cx="80"    cy="256"   r="13"/>
+    <circle cx="131.5" cy="131.5" r="13"/>
+  </g>
+  <circle cx="256" cy="80" r="30" fill="#FF3B7F" fill-opacity="0.6" filter="url(#glow)"/>
+  <circle cx="256" cy="80" r="22" fill="#FF3B7F"/>
+
+  <!-- Step back: three chevrons pointing back through the count. The lead
+       one is lit; the ones behind fade, the way a ghost overlay does. -->
+  <g fill="none" stroke-width="36" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="356,180 300,256 356,332" stroke="#FFFFFF" stroke-opacity="0.2"/>
+    <polyline points="284,180 228,256 284,332" stroke="#FFFFFF" stroke-opacity="0.85"/>
+    <polyline points="212,180 156,256 212,332" stroke="#FF3B7F"/>
+  </g>
+</svg>
