@@ -114,4 +114,23 @@ final class PhraseGridNavigationTests: XCTestCase {
     func testShiftAnchorNilWithoutAGrid() {
         XCTAssertNil(PhraseGrid.shiftAnchor(1.0, byBeats: 1, in: []))
     }
+
+    func testShiftAnchorWrapsAWholePhraseRatherThanClamping() {
+        // Anchor on beat 14 of 16, nudged forward one 8: off the end, so it
+        // comes back a phrase (8 beats here) to beat 14 + 4 - 8 = 10, which
+        // is the same count. Clamping to beat 15 would have moved "1".
+        XCTAssertEqual(
+            PhraseGrid.shiftAnchor(7.0, byBeats: 4, in: beats, keepingPhaseOf: 8),
+            5.0
+        )
+        XCTAssertEqual(
+            PhraseGrid.shiftAnchor(0.5, byBeats: -4, in: beats, keepingPhaseOf: 8),
+            2.5
+        )
+        // In range: no wrap.
+        XCTAssertEqual(
+            PhraseGrid.shiftAnchor(2.0, byBeats: 4, in: beats, keepingPhaseOf: 8),
+            4.0
+        )
+    }
 }

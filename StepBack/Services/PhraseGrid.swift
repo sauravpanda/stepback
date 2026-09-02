@@ -32,6 +32,22 @@ struct PhraseScore: Equatable {
     }
 }
 
+/// What one tap earned, the moment it landed.
+///
+/// Scoring at the end of a take tells you how you did; this tells you how
+/// you're *doing*, which is what actually trains timing — feedback a second
+/// late is feedback about a different beat.
+struct TapFeedback: Equatable {
+    /// Signed milliseconds to the nearest target. Negative = early.
+    let offsetMs: Double
+    /// Whether the tap fell inside the catch window of that target.
+    let isHit: Bool
+
+    var rating: StepRating {
+        StepRating(offsetMs: offsetMs)
+    }
+}
+
 /// Pure helpers for reasoning about musical phrases — the 8- and 32-count
 /// groupings dancers actually hear.
 ///
@@ -128,6 +144,25 @@ enum PhraseGrid {
     }
 
     // MARK: - Scoring
+
+    /// Grades a single tap against the nearest of `targets`, for feedback
+    /// in the moment. Nil when there is nothing to grade against.
+    ///
+    /// Deliberately independent of which taps have already claimed which
+    /// targets: the dancer wants to know how *this* tap landed, and the
+    /// double-tap bookkeeping belongs to the end-of-take `score`.
+    static func feedback(
+        forTap time: Double,
+        targets: [Double],
+        toleranceSeconds: Double
+    ) -> TapFeedback? {
+        guard let index = BeatGrid.nearestBeatIndex(to: time, in: targets) else { return nil }
+        let offset = time - targets[index]
+        return TapFeedback(
+            offsetMs: offset * 1_000,
+            isHit: abs(offset) <= toleranceSeconds + floatSlop
+        )
+    }
 
     /// Grades `taps` against `phraseStarts`.
     ///
@@ -246,18 +281,29 @@ extension PhraseGrid {
     }
 
     /// Moves an anchor `byBeats` along the grid, for nudging a guessed
-    /// downbeat onto the real one. Clamped to the grid, so holding the
-    /// button down can't walk the anchor off either end.
+    /// downbeat onto the real one.
+    ///
+    /// Only the anchor's position *within* the phrase matters — every count
+    /// is derived by walking `period` beats either way from it — so a nudge
+    /// that would run off the end of the grid wraps back a whole `period`
+    /// instead. Clamping there would silently change which beat is "1".
+    /// With the default period of one beat the wrap is a plain clamp, so
+    /// holding the button down still can't walk the anchor off either end.
     static func shiftAnchor(
         _ anchor: Double,
         byBeats: Int,
-        in beatTimes: [Double]
+        in beatTimes: [Double],
+        keepingPhaseOf period: Int = 1
     ) -> Double? {
         guard !beatTimes.isEmpty,
               let index = BeatGrid.nearestBeatIndex(to: anchor, in: beatTimes) else {
             return nil
         }
-        let shifted = min(max(0, index + byBeats), beatTimes.count - 1)
-        return beatTimes[shifted]
+        var shifted = index + byBeats
+        if period > 1 {
+            if shifted >= beatTimes.count { shifted -= period }
+            if shifted < 0 { shifted += period }
+        }
+        return beatTimes[min(max(0, shifted), beatTimes.count - 1)]
     }
 }

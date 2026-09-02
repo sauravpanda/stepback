@@ -5,9 +5,11 @@ import Foundation
 struct BeatAnalysis: Equatable {
     let bpm: Double
     let beatTimes: [Double]
-    /// Best guess at where beat 1 falls, from low-band onset energy. Nil
-    /// when there aren't enough beats to judge. A guess, not gospel — the
-    /// UI always leaves the user a way to nudge it.
+    /// Best guess at a beat to count from: a bar line that is also the top
+    /// of an 8 and the start of a 32-count phrase, judged from kick energy
+    /// and from where the texture of the music changes. Nil when there
+    /// aren't enough beats to judge. A guess, not gospel — the UI always
+    /// leaves the user a way to nudge it.
     let downbeatSeconds: Double?
 
     init(bpm: Double, beatTimes: [Double], downbeatSeconds: Double? = nil) {
@@ -24,12 +26,14 @@ enum BeatDetectorError: Error, Equatable {
 
 /// On-device beat detector. Apple SDKs only (AVFoundation + Accelerate).
 ///
-/// Pipeline: audio extraction → onset envelope via spectral flux (STFT) →
-/// tempo via autocorrelation of the onset envelope → phase alignment to
-/// generate absolute beat times → downbeat placement from low-band onset
-/// energy.
+/// Pipeline: audio extraction → one STFT pass yielding a broadband onset
+/// envelope, a kick-band onset envelope and a coarse band spectrogram
+/// (`BeatDetector+Spectral`) → tempo via autocorrelation of the onset
+/// envelope → beat tracking by dynamic programming (`BeatTracker`),
+/// snapped to a constant-tempo grid when one fits → bar from kick energy,
+/// 8-count and phrase from texture change (`PhraseAnchor`).
 ///
-/// The downbeat is a *guess*, offered so the Listen tab can start counting
+/// The anchor is a *guess*, offered so the Listen tab can start counting
 /// without making the user place beat 1 by hand. It is wrong often enough
 /// that every surface using it must keep a correction one tap away.
 enum BeatDetector {
@@ -38,7 +42,11 @@ enum BeatDetector {
 
     static let sampleRate: Double = 22_050
     static let windowSize: Int = 1_024
-    static let hopSize: Int = 512
+    /// Quarter-window hop: 11.6ms frames. The tracker places beats to the
+    /// frame and then refines within it, so the hop bounds how tight a grid
+    /// can get; half this again would double analysis time for a gain no
+    /// dancer could feel.
+    static let hopSize: Int = 256
     static let minBPM: Double = 60
     static let maxBPM: Double = 200
     static let foldLowerBound: Double = 75
@@ -53,6 +61,19 @@ enum BeatDetector {
     /// 4, so a broadband guess would reliably anchor the count on the
     /// backbeat. Bin 0 is DC and is skipped.
     static let kickBins: Range<Int> = 1..<8
+
+    /// Band edges, in Hz, of the coarse spectrogram phrase detection reads.
+    /// Roughly an octave each from the kick up: enough to tell a bass drop
+    /// from a vocal entry from a hi-hat pattern, few enough to stay cheap.
+    static let structureBandEdgesHz: [Double] = [20, 60, 120, 250, 500, 1_000, 2_000, 4_000, 8_000, 11_025]
+
+    /// How far the onset a frame reports actually sits *after* the frame's
+    /// start. Spectral flux peaks while the attack is in the back half of
+    /// the window — about three quarters of the way in for a sharp
+    /// transient, nearer the middle for a soft one — so a frame's start
+    /// time runs 400–600 samples ahead of the beat. Half a window splits
+    /// the difference. Without this the whole grid sat ~25ms early.
+    static let onsetLatencySeconds: Double = Double(windowSize / 2) / sampleRate
 
     /// Default metre. Matches `DanceClip.beatsPerMeasure`.
     static let defaultBeatsPerMeasure: Int = 4
@@ -74,25 +95,26 @@ enum BeatDetector {
         guard samples.count >= windowSize else {
             return BeatAnalysis(bpm: 0, beatTimes: [])
         }
-        let envelopes = computeOnsetEnvelopes(
+        let features = computeSpectralFeatures(
             samples: samples,
             windowSize: windowSize,
             hopSize: hopSize,
-            lowBandBins: kickBins
+            lowBandBins: kickBins,
+            bandBins: structureBandBins(sampleRate: sampleRate, windowSize: windowSize)
         )
         let hopSeconds = Double(hopSize) / sampleRate
-        let bpm = estimateTempo(onsets: envelopes.full, hopSeconds: hopSeconds)
-        let beatTimes = alignBeats(onsets: envelopes.full, bpm: bpm, hopSeconds: hopSeconds)
-        let phase = estimateDownbeatPhase(
-            lowBandOnsets: envelopes.lowBand,
-            beatTimes: beatTimes,
+        let coarseBPM = estimateTempo(onsets: features.full, hopSeconds: hopSeconds)
+        let tracked = trackBeats(onsets: features.full, bpm: coarseBPM, hopSeconds: hopSeconds)
+        let anchor = estimateAnchor(
+            features: features,
+            beatTimes: tracked.beatTimes,
             hopSeconds: hopSeconds,
             beatsPerMeasure: beatsPerMeasure
         )
         return BeatAnalysis(
-            bpm: bpm,
-            beatTimes: beatTimes,
-            downbeatSeconds: phase.flatMap { beatTimes.indices.contains($0) ? beatTimes[$0] : nil }
+            bpm: tracked.bpm,
+            beatTimes: tracked.beatTimes,
+            downbeatSeconds: anchor.flatMap { tracked.beatTimes.indices.contains($0) ? tracked.beatTimes[$0] : nil }
         )
     }
 
@@ -147,132 +169,23 @@ enum BeatDetector {
         }
         return samples
     }
+}
 
-    // MARK: - Onset envelope (half-wave rectified spectral flux)
+// MARK: - Tempo
 
-    /// Broadband onset envelope — what tempo estimation runs on.
-    static func computeOnsetEnvelope(
-        samples: [Float],
-        windowSize: Int,
-        hopSize: Int
-    ) -> [Float] {
-        computeOnsetEnvelopes(
-            samples: samples,
-            windowSize: windowSize,
-            hopSize: hopSize,
-            lowBandBins: kickBins
-        ).full
-    }
+/// Split into extensions to keep each body under SwiftLint's
+/// `type_body_length` limit; these are ordinary members of `BeatDetector`.
+extension BeatDetector {
 
-    /// Broadband and low-band onset envelopes from a **single** STFT pass.
+    /// Tempo in BPM from the autocorrelation of the onset envelope.
     ///
-    /// Tempo wants the whole spectrum; downbeat placement wants only the
-    /// kick band. Running the FFT twice to get them would double the cost
-    /// of analysing a clip for no reason, so both are accumulated as the
-    /// same spectra are computed.
-    static func computeOnsetEnvelopes(
-        samples: [Float],
-        windowSize: Int,
-        hopSize: Int,
-        lowBandBins: Range<Int>
-    ) -> (full: [Float], lowBand: [Float]) {
-        let halfSize = windowSize / 2
-        let log2N = vDSP_Length(log2(Double(windowSize)).rounded())
-        guard let fftSetup = vDSP_create_fftsetup(log2N, FFTRadix(kFFTRadix2)) else {
-            return ([], [])
-        }
-        let lowBand = lowBandBins.clamped(to: 0..<halfSize)
-        defer { vDSP_destroy_fftsetup(fftSetup) }
-
-        var window = [Float](repeating: 0, count: windowSize)
-        vDSP_hann_window(&window, vDSP_Length(windowSize), Int32(vDSP_HANN_NORM))
-
-        var windowed = [Float](repeating: 0, count: windowSize)
-        var realp = [Float](repeating: 0, count: halfSize)
-        var imagp = [Float](repeating: 0, count: halfSize)
-        var magnitudes = [Float](repeating: 0, count: halfSize)
-        var previousMagnitudes = [Float](repeating: 0, count: halfSize)
-        var diff = [Float](repeating: 0, count: halfSize)
-
-        var onsets: [Float] = []
-        var lowOnsets: [Float] = []
-        var pos = 0
-        let limit = samples.count - windowSize
-
-        while pos <= limit {
-            samples.withUnsafeBufferPointer { buf in
-                guard let base = buf.baseAddress else { return }
-                vDSP_vmul(
-                    base.advanced(by: pos), 1,
-                    window, 1,
-                    &windowed, 1,
-                    vDSP_Length(windowSize)
-                )
-            }
-
-            windowed.withUnsafeBufferPointer { buf in
-                guard let base = buf.baseAddress else { return }
-                base.withMemoryRebound(to: DSPComplex.self, capacity: halfSize) { complexPtr in
-                    realp.withUnsafeMutableBufferPointer { realBuf in
-                        imagp.withUnsafeMutableBufferPointer { imagBuf in
-                            guard let rBase = realBuf.baseAddress,
-                                  let iBase = imagBuf.baseAddress else { return }
-                            var split = DSPSplitComplex(realp: rBase, imagp: iBase)
-                            vDSP_ctoz(complexPtr, 2, &split, 1, vDSP_Length(halfSize))
-                            vDSP_fft_zrip(fftSetup, &split, 1, log2N, Int32(FFT_FORWARD))
-                            vDSP_zvmags(&split, 1, &magnitudes, 1, vDSP_Length(halfSize))
-                        }
-                    }
-                }
-            }
-
-            magnitudes.withUnsafeMutableBufferPointer { buf in
-                guard let base = buf.baseAddress else { return }
-                var count = Int32(buf.count)
-                vvsqrtf(base, base, &count)
-            }
-
-            vDSP_vsub(
-                previousMagnitudes, 1,
-                magnitudes, 1,
-                &diff, 1,
-                vDSP_Length(halfSize)
-            )
-            diff.withUnsafeMutableBufferPointer { buf in
-                guard let base = buf.baseAddress else { return }
-                var zero: Float = 0
-                vDSP_vthr(base, 1, &zero, base, 1, vDSP_Length(buf.count))
-            }
-            var flux: Float = 0
-            var lowFlux: Float = 0
-            diff.withUnsafeBufferPointer { buf in
-                guard let base = buf.baseAddress else { return }
-                vDSP_sve(base, 1, &flux, vDSP_Length(halfSize))
-                guard !lowBand.isEmpty else { return }
-                vDSP_sve(
-                    base.advanced(by: lowBand.lowerBound), 1,
-                    &lowFlux,
-                    vDSP_Length(lowBand.count)
-                )
-            }
-
-            onsets.append(flux)
-            lowOnsets.append(lowFlux)
-            previousMagnitudes = magnitudes
-            pos += hopSize
-        }
-        return (normalised(onsets), normalised(lowOnsets))
-    }
-
-    /// Scales an envelope to a 0...1 peak so the two bands are comparable
-    /// and thresholds don't depend on absolute loudness.
-    private static func normalised(_ envelope: [Float]) -> [Float] {
-        guard let peak = envelope.max(), peak > 0 else { return envelope }
-        return envelope.map { $0 / peak }
-    }
-
-    // MARK: - Tempo via autocorrelation
-
+    /// The envelope is mean-centred first so the correlation measures
+    /// rhythm rather than loudness, and each lag is normalised by its
+    /// overlap so shorter lags don't win merely for having more terms. The
+    /// peak lag is then refined by fitting a parabola through it and its
+    /// neighbours: whole-frame lags can only express tempos ~2–5% apart at
+    /// dance speeds, and a grid laid at the wrong one of those drifts a
+    /// full beat in under a minute.
     static func estimateTempo(onsets: [Float], hopSeconds: Double) -> Double {
         guard !onsets.isEmpty, hopSeconds > 0 else { return 0 }
 
@@ -281,35 +194,88 @@ enum BeatDetector {
         let clampedMaxLag = min(maxLag, onsets.count - 1)
         guard clampedMaxLag > minLag else { return 120 }
 
-        var bestLag = minLag
-        var bestScore: Float = -.infinity
+        let count = vDSP_Length(onsets.count)
+        var mean: Float = 0
+        vDSP_meanv(onsets, 1, &mean, count)
+        var negativeMean = -mean
+        var centred = [Float](repeating: 0, count: onsets.count)
+        vDSP_vsadd(onsets, 1, &negativeMean, &centred, 1, count)
 
-        onsets.withUnsafeBufferPointer { buf in
+        var scores = [Float](repeating: -.infinity, count: clampedMaxLag + 1)
+        centred.withUnsafeBufferPointer { buf in
             guard let base = buf.baseAddress else { return }
             for lag in minLag...clampedMaxLag {
                 var score: Float = 0
-                vDSP_dotpr(
-                    base, 1,
-                    base.advanced(by: lag), 1,
-                    &score,
-                    vDSP_Length(onsets.count - lag)
-                )
-                if score > bestScore {
-                    bestScore = score
-                    bestLag = lag
-                }
+                vDSP_dotpr(base, 1, base.advanced(by: lag), 1, &score, vDSP_Length(onsets.count - lag))
+                scores[lag] = score / Float(onsets.count - lag)
+            }
+        }
+        let bestLag = (minLag...clampedMaxLag).max { scores[$0] < scores[$1] } ?? minLag
+
+        var lag = Double(bestLag)
+        if bestLag > minLag, bestLag < clampedMaxLag {
+            let left = Double(scores[bestLag - 1])
+            let centre = Double(scores[bestLag])
+            let right = Double(scores[bestLag + 1])
+            let curvature = left - 2 * centre + right
+            if curvature < 0 {
+                lag += min(0.5, max(-0.5, 0.5 * (left - right) / curvature))
             }
         }
 
-        var bpm = 60.0 / (Double(bestLag) * hopSeconds)
+        var bpm = 60.0 / (lag * hopSeconds)
         while bpm > foldUpperBound { bpm /= 2 }
         while bpm < foldLowerBound, bpm > 0 { bpm *= 2 }
         return bpm
     }
+}
 
-    // MARK: - Phase alignment
+// MARK: - Beat tracking
 
+extension BeatDetector {
+
+    /// Absolute beat times for the envelope. Kept for callers that only
+    /// want the grid; `trackBeats` also reports the tempo it settled on.
     static func alignBeats(onsets: [Float], bpm: Double, hopSeconds: Double) -> [Double] {
+        trackBeats(onsets: onsets, bpm: bpm, hopSeconds: hopSeconds).beatTimes
+    }
+
+    /// Beat times across the whole envelope, plus the tempo they imply.
+    ///
+    /// `BeatTracker` follows the music; if what it followed turns out to be
+    /// a constant tempo, the beats are snapped to that grid — exact
+    /// spacing, no frame jitter, and a BPM read off hundreds of beats
+    /// rather than one autocorrelation peak. Otherwise the tracked beats
+    /// stand and are extended at their local tempo to cover intro and
+    /// outro. A clip with nothing to track falls back to a rigid grid at
+    /// the estimated tempo, which is what the old detector always did.
+    static func trackBeats(
+        onsets: [Float],
+        bpm: Double,
+        hopSeconds: Double
+    ) -> (beatTimes: [Double], bpm: Double) {
+        guard bpm > 0, hopSeconds > 0, !onsets.isEmpty else { return ([], bpm) }
+        let span = 0...(Double(onsets.count) * hopSeconds)
+        let frames = BeatTracker.track(onsets: onsets, period: 60.0 / bpm / hopSeconds)
+        guard frames.count >= 2 else {
+            return (rigidLattice(onsets: onsets, bpm: bpm, hopSeconds: hopSeconds), bpm)
+        }
+        let times = BeatTracker.refine(frames: frames, onsets: onsets)
+            .map { $0 * hopSeconds + onsetLatencySeconds }
+        if let lattice = BeatTracker.fitLattice(beatTimes: times) {
+            return (lattice.times(covering: span), 60.0 / lattice.period)
+        }
+        let interval = BeatTracker.medianInterval(times)
+        return (
+            BeatTracker.extended(beatTimes: times, toCover: span),
+            interval > 0 ? 60.0 / interval : bpm
+        )
+    }
+
+    /// A fixed grid at `bpm`, phased to put the most onset energy under
+    /// the beats. The pre-tracker algorithm, kept as the fallback for an
+    /// envelope too quiet or too short to track.
+    static func rigidLattice(onsets: [Float], bpm: Double, hopSeconds: Double) -> [Double] {
         guard bpm > 0, hopSeconds > 0, !onsets.isEmpty else { return [] }
         let hopsPerBeat = 60.0 / bpm / hopSeconds
         let offsetRange = max(1, Int(hopsPerBeat.rounded()))
@@ -334,29 +300,50 @@ enum BeatDetector {
         var beats: [Double] = []
         var beatIndex = 0
         while true {
-            let hop = bestOffset + Int((Double(beatIndex) * hopsPerBeat).rounded())
-            if hop >= onsets.count { break }
-            beats.append(Double(hop) * hopSeconds)
+            let hop = Double(bestOffset) + Double(beatIndex) * hopsPerBeat
+            if hop >= Double(onsets.count) { break }
+            beats.append(hop * hopSeconds + onsetLatencySeconds)
             beatIndex += 1
         }
         return beats
     }
 }
 
-// MARK: - Downbeat placement
+// MARK: - Downbeat and phrase placement
 
-/// Split into an extension to keep the enum body under SwiftLint's
-/// `type_body_length` limit; these are ordinary members of `BeatDetector`.
 extension BeatDetector {
 
-    /// Index of the beat most likely to be beat 1, judged by kick energy.
-    ///
-    /// Every beat belongs to one of `beatsPerMeasure` phases. Summing
-    /// low-band onset strength across each phase and taking the strongest
-    /// picks out the one the kick lands on, which in practice is the "one".
-    /// Returns nil when there isn't a full measure of beats to compare, in
-    /// which case guessing would be noise.
-    ///
+    /// Index of the beat to count from, or nil when there is no kick energy
+    /// anywhere on the grid to judge the bar by — silence, or audio with no
+    /// low end at all. `estimateTempo` will still have produced a grid from
+    /// a flat envelope, so without this the caller would get a confidently
+    /// placed "one" derived from nothing. Declining lets the UI say it
+    /// doesn't know instead.
+    static func estimateAnchor(
+        features: SpectralFeatures,
+        beatTimes: [Double],
+        hopSeconds: Double,
+        beatsPerMeasure: Int
+    ) -> Int? {
+        guard let kick = downbeatPhaseScores(
+            lowBandOnsets: features.lowBand,
+            beatTimes: beatTimes,
+            hopSeconds: hopSeconds,
+            beatsPerMeasure: beatsPerMeasure
+        ) else {
+            return nil
+        }
+        return PhraseAnchor.estimate(
+            beatTimes: beatTimes,
+            measureScores: kick,
+            beatsPerMeasure: beatsPerMeasure,
+            spectrogram: features.bands,
+            hopSeconds: hopSeconds
+        )
+    }
+
+    /// Index of the beat most likely to be beat 1, judged by kick energy
+    /// alone. See `downbeatPhaseScores` for the vote; this is its winner.
     /// The returned value is an index into `beatTimes`, and is always the
     /// *first* beat of that phase so the anchor sits as early in the clip
     /// as possible.
@@ -366,43 +353,63 @@ extension BeatDetector {
         hopSeconds: Double,
         beatsPerMeasure: Int
     ) -> Int? {
+        guard let scores = downbeatPhaseScores(
+            lowBandOnsets: lowBandOnsets,
+            beatTimes: beatTimes,
+            hopSeconds: hopSeconds,
+            beatsPerMeasure: beatsPerMeasure
+        ) else {
+            return nil
+        }
+        return scores.indices.max { scores[$0] < scores[$1] }
+    }
+
+    /// Kick energy summed over each phase of the bar.
+    ///
+    /// Every beat belongs to one of `beatsPerMeasure` phases. Summing
+    /// low-band onset strength across each phase picks out the one the
+    /// kick lands on, which in practice is the "one" — or the one *and*
+    /// the three, which is why `PhraseAnchor` gets the whole vote rather
+    /// than just the winner. Nil when there isn't a full bar of beats to
+    /// compare, or no kick energy at all.
+    static func downbeatPhaseScores(
+        lowBandOnsets: [Float],
+        beatTimes: [Double],
+        hopSeconds: Double,
+        beatsPerMeasure: Int
+    ) -> [Double]? {
         guard !lowBandOnsets.isEmpty,
               hopSeconds > 0,
               beatsPerMeasure > 0,
               beatTimes.count >= beatsPerMeasure else {
             return nil
         }
-
         var scores = [Double](repeating: 0, count: beatsPerMeasure)
         for (index, time) in beatTimes.enumerated() {
             scores[index % beatsPerMeasure] += Double(
-                strength(of: lowBandOnsets, atTime: time, hopSeconds: hopSeconds)
+                strength(of: lowBandOnsets, atBeat: time, hopSeconds: hopSeconds)
             )
         }
-        guard let best = scores.indices.max(by: { scores[$0] < scores[$1] }) else { return nil }
-        // No kick energy anywhere on the grid — silence, or audio with no
-        // low end at all. `estimateTempo` will still have produced a beat
-        // grid from a flat envelope, so without this the caller would get a
-        // confidently-placed "one" derived from nothing. Declining lets the
-        // UI say it doesn't know instead.
-        guard scores[best] > 0 else { return nil }
-        return best
+        guard scores.contains(where: { $0 > 0 }) else { return nil }
+        return scores
     }
 
-    /// Peak envelope value within one hop either side of `time`.
+    /// Peak envelope value within two frames either side of the frame a
+    /// beat at `time` came from.
     ///
-    /// `alignBeats` emits beat times on exact hop boundaries, but a beat
-    /// grid that has been rescaled or hand-nudged will not be, so sampling
-    /// a single index would sometimes read the trough beside an onset
-    /// rather than the onset itself.
+    /// The kick's attack is slower than the snare's, so its low-band peak
+    /// can trail the broadband onset the beat was placed on by a frame; and
+    /// a grid that has been snapped or hand-nudged will not sit on frame
+    /// boundaries at all. Sampling a single frame would sometimes read the
+    /// trough beside an onset rather than the onset itself.
     private static func strength(
         of envelope: [Float],
-        atTime time: Double,
+        atBeat time: Double,
         hopSeconds: Double
     ) -> Float {
-        let centre = Int((time / hopSeconds).rounded())
-        let lower = max(0, centre - 1)
-        let upper = min(envelope.count - 1, centre + 1)
+        let centre = frameIndex(forBeatAt: time, hopSeconds: hopSeconds)
+        let lower = max(0, centre - 2)
+        let upper = min(envelope.count - 1, centre + 2)
         guard lower <= upper else { return 0 }
         return envelope[lower...upper].max() ?? 0
     }
