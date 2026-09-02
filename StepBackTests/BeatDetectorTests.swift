@@ -4,73 +4,94 @@ import XCTest
 
 final class BeatDetectorTests: XCTestCase {
 
-    private let sampleRate: Double = 22_050
+    private let sampleRate = SyntheticAudio.sampleRate
 
-    // MARK: - Synthetic click tracks
-
-    /// Generates a click track: short decaying 1kHz sine pulses at the given
-    /// BPM for `duration` seconds. This is deliberately a bit noisy (click is
-    /// a windowed tone, not a delta) so the onset detector has something
-    /// realistic to latch onto.
-    private func clickTrack(bpm: Double, duration: Double, sampleRate: Double) -> [Float] {
-        let totalSamples = Int(duration * sampleRate)
-        var samples = [Float](repeating: 0, count: totalSamples)
-
-        let beatInterval = 60.0 / bpm
-        let clickDuration = 0.05
-        let clickSamples = Int(clickDuration * sampleRate)
-        let numBeats = Int(duration / beatInterval) + 1
-
-        for beatIndex in 0..<numBeats {
-            let startSample = Int(Double(beatIndex) * beatInterval * sampleRate)
-            for offset in 0..<clickSamples {
-                let idx = startSample + offset
-                if idx >= totalSamples { break }
-                let localTime = Double(offset) / sampleRate
-                let decay = exp(-localTime * 20)
-                let tone = sin(2 * .pi * 1_000 * localTime) * decay * 0.5
-                samples[idx] += Float(tone)
-            }
-        }
-        return samples
+    private func clickTrack(bpm: Double, duration: Double) -> [Float] {
+        SyntheticAudio.clickTrack(bpm: bpm, duration: duration)
     }
 
     // MARK: - Tempo estimation
 
     func testDetects120BPMFromClickTrack() {
-        let samples = clickTrack(bpm: 120, duration: 10, sampleRate: sampleRate)
-        let analysis = BeatDetector.analyzeSamples(samples, sampleRate: sampleRate)
-        XCTAssertEqual(analysis.bpm, 120, accuracy: 2.0, "BPM was \(analysis.bpm)")
+        let analysis = BeatDetector.analyzeSamples(clickTrack(bpm: 120, duration: 10), sampleRate: sampleRate)
+        XCTAssertEqual(analysis.bpm, 120, accuracy: 0.5, "BPM was \(analysis.bpm)")
     }
 
     func testDetects96BPMFromClickTrack() {
-        let samples = clickTrack(bpm: 96, duration: 12, sampleRate: sampleRate)
-        let analysis = BeatDetector.analyzeSamples(samples, sampleRate: sampleRate)
-        XCTAssertEqual(analysis.bpm, 96, accuracy: 2.0, "BPM was \(analysis.bpm)")
+        let analysis = BeatDetector.analyzeSamples(clickTrack(bpm: 96, duration: 12), sampleRate: sampleRate)
+        XCTAssertEqual(analysis.bpm, 96, accuracy: 0.5, "BPM was \(analysis.bpm)")
     }
 
     func testDetects150BPMFromClickTrack() {
-        let samples = clickTrack(bpm: 150, duration: 10, sampleRate: sampleRate)
-        let analysis = BeatDetector.analyzeSamples(samples, sampleRate: sampleRate)
-        XCTAssertEqual(analysis.bpm, 150, accuracy: 2.0, "BPM was \(analysis.bpm)")
+        let analysis = BeatDetector.analyzeSamples(clickTrack(bpm: 150, duration: 10), sampleRate: sampleRate)
+        XCTAssertEqual(analysis.bpm, 150, accuracy: 0.5, "BPM was \(analysis.bpm)")
+    }
+
+    func testTempoIsResolvedFinerThanAWholeFrame() {
+        // 117 BPM is 44.17 frames per beat: not on a frame boundary, so a
+        // whole-frame lag would report 117.4 or 114.8. Neither is 117.
+        let analysis = BeatDetector.analyzeSamples(clickTrack(bpm: 117, duration: 20), sampleRate: sampleRate)
+        XCTAssertEqual(analysis.bpm, 117, accuracy: 0.3, "BPM was \(analysis.bpm)")
     }
 
     // MARK: - Beat-time alignment
 
     func testBeatTimesMatchClickPositionsAt120BPM() {
-        let samples = clickTrack(bpm: 120, duration: 8, sampleRate: sampleRate)
-        let analysis = BeatDetector.analyzeSamples(samples, sampleRate: sampleRate)
+        let analysis = BeatDetector.analyzeSamples(clickTrack(bpm: 120, duration: 8), sampleRate: sampleRate)
 
         XCTAssertGreaterThanOrEqual(analysis.beatTimes.count, 12)
 
         // Adjacent beat spacing should sit near 60/bpm (0.5s) within a
-        // couple of frames of slop (~46ms @ hop=512/22050).
+        // couple of frames of slop.
         let expectedInterval = 60.0 / 120.0
-        let tolerance = 0.06
         for index in 1..<analysis.beatTimes.count {
             let delta = analysis.beatTimes[index] - analysis.beatTimes[index - 1]
-            XCTAssertEqual(delta, expectedInterval, accuracy: tolerance)
+            XCTAssertEqual(delta, expectedInterval, accuracy: 0.03)
         }
+    }
+
+    func testBeatsLandOnTheClicksNotAheadOfThem() {
+        // Spectral flux peaks while the attack is still entering the
+        // window, so raw frame times run ~25ms early. The detector corrects
+        // for that; here the grid must sit on the clicks to within a few ms
+        // with no systematic lean either way.
+        let analysis = BeatDetector.analyzeSamples(clickTrack(bpm: 120, duration: 12), sampleRate: sampleRate)
+        let interior = analysis.beatTimes.filter { $0 > 0.3 && $0 < 11.5 }
+        XCTAssertGreaterThan(interior.count, 20)
+
+        let offsets = interior.map { $0 - ($0 / 0.5).rounded() * 0.5 }
+        for offset in offsets {
+            XCTAssertEqual(offset, 0, accuracy: 0.012, "beat \(offset * 1_000)ms off its click")
+        }
+        let mean = offsets.reduce(0, +) / Double(offsets.count)
+        XCTAssertEqual(mean, 0, accuracy: 0.008, "grid leans \(mean * 1_000)ms")
+    }
+
+    func testConstantTempoSnapsToAnExactGrid() {
+        // A produced track deserves a grid with no frame jitter: once the
+        // tracked beats fit a constant tempo, every interval is identical.
+        let analysis = BeatDetector.analyzeSamples(clickTrack(bpm: 128, duration: 20), sampleRate: sampleRate)
+        let intervals = zip(analysis.beatTimes.dropFirst(), analysis.beatTimes).map { $0 - $1 }
+        guard let first = intervals.first else { return XCTFail("no beats") }
+        for interval in intervals {
+            XCTAssertEqual(interval, first, accuracy: 1e-6)
+        }
+        XCTAssertEqual(first, 60.0 / 128, accuracy: 0.002)
+    }
+
+    func testFollowsATempoRamp() {
+        // 112 to 128 BPM over 40 seconds. A single-tempo grid is a beat off
+        // at both ends; the tracker should stay on every click.
+        let (samples, clicks) = SyntheticAudio.rampingClickTrack(startBPM: 112, endBPM: 128, duration: 40)
+        let analysis = BeatDetector.analyzeSamples(samples, sampleRate: sampleRate)
+
+        for click in clicks where click > 0.5 && click < 39 {
+            let nearest = analysis.beatTimes.map { abs($0 - click) }.min() ?? .infinity
+            XCTAssertLessThan(nearest, 0.025, "no beat within 25ms of the click at \(click)s")
+        }
+        let tracked = analysis.beatTimes.filter { $0 > 0.5 && $0 < 39 }
+        let expected = clicks.filter { $0 > 0.5 && $0 < 39 }
+        XCTAssertEqual(tracked.count, expected.count, accuracy: 2)
     }
 
     // MARK: - Degenerate inputs
@@ -103,8 +124,7 @@ final class BeatDetectorTests: XCTestCase {
 
     func testFoldsHighBPMIntoWCSRange() {
         // 240 BPM (every quarter-second) should fold down to 120.
-        let samples = clickTrack(bpm: 240, duration: 8, sampleRate: sampleRate)
-        let analysis = BeatDetector.analyzeSamples(samples, sampleRate: sampleRate)
+        let analysis = BeatDetector.analyzeSamples(clickTrack(bpm: 240, duration: 8), sampleRate: sampleRate)
         XCTAssertLessThanOrEqual(analysis.bpm, BeatDetector.foldUpperBound + 2)
         XCTAssertGreaterThanOrEqual(analysis.bpm, BeatDetector.foldLowerBound - 2)
     }
@@ -118,45 +138,19 @@ final class BeatDetectorTests: XCTestCase {
         )
     }
 
-    // MARK: - Downbeat placement
-
-    /// Click track where each beat gets a plain 1 kHz tick, plus an
-    /// optional accent on one phase of the measure. `kickHz` accents land
-    /// in the low band the downbeat estimator reads; `snareHz` accents sit
-    /// well above it.
-    private func accentedTrack(
-        bpm: Double,
-        duration: Double,
-        beatsPerMeasure: Int,
-        kickPhase: Int?,
-        snarePhase: Int? = nil
-    ) -> [Float] {
-        var samples = clickTrack(bpm: bpm, duration: duration, sampleRate: sampleRate)
-        let beatInterval = 60.0 / bpm
-        let totalSamples = samples.count
-        let beats = Int(duration / beatInterval) + 1
-
-        for beatIndex in 0..<beats {
-            let phase = beatIndex % beatsPerMeasure
-            let isKick = phase == kickPhase
-            let isSnare = phase == snarePhase
-            guard isKick || isSnare else { continue }
-
-            // 60Hz sits in kickBins (bin ~3); 3kHz is far outside it.
-            let frequency: Double = isKick ? 60 : 3_000
-            let decay: Double = isKick ? 8 : 30
-            let start = Int(Double(beatIndex) * beatInterval * sampleRate)
-            let length = Int(0.12 * sampleRate)
-            for offset in 0..<length {
-                let idx = start + offset
-                if idx >= totalSamples { break }
-                let localTime = Double(offset) / sampleRate
-                let envelope = exp(-localTime * decay)
-                samples[idx] += Float(sin(2 * .pi * frequency * localTime) * envelope * 0.9)
-            }
-        }
-        return samples
+    func testRigidLatticeFallsBackWhenThereIsNothingToTrack() {
+        // A flat envelope has no beats to follow, but the caller still gets
+        // a grid at the estimated tempo — the pre-tracker behaviour.
+        let beats = BeatDetector.trackBeats(
+            onsets: [Float](repeating: 0.001, count: 400),
+            bpm: 120,
+            hopSeconds: 0.0116
+        )
+        XCTAssertGreaterThan(beats.beatTimes.count, 5)
+        XCTAssertEqual(beats.bpm, 120)
     }
+
+    // MARK: - Downbeat placement
 
     private func estimatePhase(
         in samples: [Float],
@@ -181,16 +175,12 @@ final class BeatDetectorTests: XCTestCase {
     }
 
     func testFindsDownbeatWhenKickIsOnBeatOne() {
-        let samples = accentedTrack(
-            bpm: 120, duration: 16, beatsPerMeasure: 4, kickPhase: 0
-        )
+        let samples = SyntheticAudio.accentedTrack(bpm: 120, duration: 16, beatsPerMeasure: 4, kickPhase: 0)
         XCTAssertEqual(estimatePhase(in: samples, bpm: 120, duration: 16), 0)
     }
 
     func testFindsDownbeatWhenKickIsOnAnOffsetPhase() {
-        let samples = accentedTrack(
-            bpm: 120, duration: 16, beatsPerMeasure: 4, kickPhase: 2
-        )
+        let samples = SyntheticAudio.accentedTrack(bpm: 120, duration: 16, beatsPerMeasure: 4, kickPhase: 2)
         XCTAssertEqual(estimatePhase(in: samples, bpm: 120, duration: 16), 2)
     }
 
@@ -199,7 +189,7 @@ final class BeatDetectorTests: XCTestCase {
         // broadband envelope: here the snare on beat 3 is louder in overall
         // spectral flux than the kick on beat 1, and a broadband guess would
         // anchor the count on the backbeat.
-        let samples = accentedTrack(
+        let samples = SyntheticAudio.accentedTrack(
             bpm: 120, duration: 16, beatsPerMeasure: 4, kickPhase: 0, snarePhase: 2
         )
         XCTAssertEqual(estimatePhase(in: samples, bpm: 120, duration: 16), 0)
@@ -228,14 +218,13 @@ final class BeatDetectorTests: XCTestCase {
     }
 
     func testAnalysisSurfacesTheDownbeatAsATimestamp() {
-        let samples = accentedTrack(
-            bpm: 120, duration: 16, beatsPerMeasure: 4, kickPhase: 0
-        )
+        let samples = SyntheticAudio.accentedTrack(bpm: 120, duration: 16, beatsPerMeasure: 4, kickPhase: 0)
         let analysis = BeatDetector.analyzeSamples(samples, sampleRate: sampleRate)
         let downbeat = analysis.downbeatSeconds
         XCTAssertNotNil(downbeat)
         // Whatever beat it picked must actually be on the detected grid.
         XCTAssertTrue(analysis.beatTimes.contains { abs($0 - (downbeat ?? -1)) < 1e-9 })
+        XCTAssertEqual(Int(((downbeat ?? -1) / 0.5).rounded()) % 4, 0)
     }
 
     func testSilenceYieldsNoDownbeat() {

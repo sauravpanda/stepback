@@ -186,6 +186,18 @@ final class PracticePlayerViewModel: ObservableObject {
         }
     }
 
+    /// Discards the clip's cached analysis — grid, tempo and anchor alike —
+    /// and runs the detector again. An explicit ask, so a hand-placed
+    /// anchor is replaced along with everything else: the caller wants the
+    /// detector's current answer, not a blend of old and new.
+    func redetectBeats(for clip: DanceClip, onSave: @escaping () -> Void) async {
+        guard !isAnalyzingBeats else { return }
+        clip.bpm = nil
+        clip.setBeatTimes([])
+        clip.firstDownbeatSeconds = nil
+        await detectBeats(for: clip, onSave: onSave)
+    }
+
     /// Marks the current playback position as beat 1. Caller persists.
     ///
     /// Reads `precisePlaybackTime` rather than `currentTime`: every measure

@@ -5,6 +5,16 @@ import UIKit
 // chrome in `ListeningUI` so neither file outgrows SwiftLint's length limit
 // and each stays about one thing.
 
+/// Colours the drills share for the two ways a tap can go wrong.
+enum DrillPalette {
+    /// A target nobody tapped. Dimmed so it can't be confused with an
+    /// `.off` hit, which uses `StepRating`'s full red.
+    static let missed = Color(hex: 0xFF5F5F).opacity(0.35)
+    /// A tap that landed on nothing.
+    static let stray = Color(hex: 0xFFD93B)
+    static let error = Color(hex: 0xFF5F5F)
+}
+
 // MARK: - Exercise picker
 
 struct ExercisePicker: View {
@@ -36,22 +46,18 @@ struct ExercisePicker: View {
     }
 }
 
-// MARK: - Phrase ribbon
+// MARK: - Target ribbon
 
-enum PhraseSlotState: Equatable {
-    case pending
-    case hit
-    case missed
-}
-
-/// One cell per phrase in the take, filling in as the drill runs. Gives the
-/// dancer a sense of how far through they are and where they dropped the
-/// count, without having to wait for the results card.
+/// One cell per target in the take, filling in as the drill runs. Gives
+/// the dancer a sense of how far through they are and where they dropped
+/// the count, without having to wait for the results card. Hits are
+/// coloured by how tight they were, so a run of yellow says "you're
+/// catching it, but late" before the summary does.
 struct PhraseRibbon: View {
     let states: [PhraseSlotState]
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: states.count > 12 ? 2 : 4) {
             ForEach(Array(states.enumerated()), id: \.offset) { _, state in
                 RoundedRectangle(cornerRadius: 3)
                     .fill(color(for: state))
@@ -64,28 +70,105 @@ struct PhraseRibbon: View {
     private func color(for state: PhraseSlotState) -> Color {
         switch state {
         case .pending: Theme.Color.surfaceElevated
-        case .hit: Theme.Color.speedGreen
-        case .missed: Color(hex: 0xFF5F5F)
+        case .hit(let rating): rating.color
+        case .missed: DrillPalette.missed
         }
+    }
+}
+
+// MARK: - Live feedback
+
+/// What the last tap earned, shown the instant it lands.
+///
+/// Motor timing learns from feedback inside a second; a percentage at the
+/// end of eight phrases is a report, not a lesson. Fixed height so the
+/// panel doesn't jump as the text changes.
+struct TapFeedbackLabel: View {
+    let feedback: TapFeedback?
+    let exercise: ListeningExercise
+    /// Changes with every tap, so identical feedback twice running still
+    /// visibly registers as a new tap.
+    let tapCount: Int
+
+    @State private var scale: CGFloat = 1
+
+    private static let height: CGFloat = 20
+
+    var body: some View {
+        Text(text)
+            .font(.system(.footnote, design: .rounded, weight: .semibold))
+            .monospacedDigit()
+            .foregroundStyle(color)
+            .scaleEffect(scale)
+            .frame(height: Self.height)
+            .frame(maxWidth: .infinity)
+            .onChange(of: tapCount) { _, _ in
+                withAnimation(.easeOut(duration: 0.05)) { scale = 1.12 }
+                withAnimation(.easeIn(duration: 0.2).delay(0.05)) { scale = 1 }
+            }
+    }
+
+    private var text: String {
+        guard let feedback else {
+            return exercise.gradesEveryBeat
+                ? "Tap along — early or late shows here"
+                : "Listening for your first 1…"
+        }
+        let magnitude = Int(abs(feedback.offsetMs).rounded())
+        let side = feedback.offsetMs < 0 ? "early" : "late"
+        guard feedback.isHit else {
+            return "Stray — \(magnitude)ms \(side) of the nearest 1"
+        }
+        let timing = magnitude < 10 ? "dead on" : "\(magnitude)ms \(side)"
+        return "\(feedback.rating.label) · \(timing)"
+    }
+
+    private var color: Color {
+        guard let feedback else { return Theme.Color.textTertiary }
+        return feedback.isHit ? feedback.rating.color : DrillPalette.error
+    }
+}
+
+/// One haptic per tap, graded like the feedback: the lighter it feels, the
+/// closer it landed. A stray tap gets the error buzz, which is unmistakable
+/// even with eyes on the dance floor rather than the screen.
+enum DrillHaptics {
+    static func play(for feedback: TapFeedback?) {
+        guard let feedback, feedback.isHit else {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            return
+        }
+        let style: UIImpactFeedbackGenerator.FeedbackStyle
+        switch feedback.rating {
+        case .perfect: style = .light
+        case .good: style = .medium
+        case .off: style = .rigid
+        }
+        UIImpactFeedbackGenerator(style: style).impactOccurred()
     }
 }
 
 // MARK: - Tap target
 
 /// Full-width pad. Timing drills live or die on the tap being effortless
-/// and unambiguous, so this is deliberately huge and fires a haptic on
-/// contact — the same feedback PracticeView uses for beat-1 anchoring.
+/// and unambiguous, so this is deliberately huge. It flashes in the colour
+/// of what the tap earned; a drill that grades its own taps passes
+/// `hapticOnTap: false` and plays the graded haptic itself.
 struct BigTapTarget: View {
     let title: String
     let subtitle: String
     let isEnabled: Bool
+    var flashColor: Color = Theme.Color.speedGreen
+    var hapticOnTap = true
     let onTap: () -> Void
 
     @State private var flash: Bool = false
 
     var body: some View {
         Button {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            if hapticOnTap {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
             onTap()
             withAnimation(.easeOut(duration: 0.06)) { flash = true }
             withAnimation(.easeIn(duration: 0.2).delay(0.06)) { flash = false }
@@ -111,11 +194,23 @@ struct BigTapTarget: View {
 
     private var background: Color {
         guard isEnabled else { return Theme.Color.surfaceElevated }
-        return flash ? Theme.Color.speedGreen : Theme.Color.accent
+        return flash ? flashColor : Theme.Color.accent
     }
 }
 
 // MARK: - Results
+
+/// Sign is the coaching cue: a consistent bias is a fixable habit, whereas
+/// noise around zero just means the count is loose.
+private func timingSummary(_ average: Double) -> String {
+    let magnitude = Int(abs(average).rounded())
+    if magnitude < 25 {
+        return "Dead on — average \(magnitude)ms off."
+    }
+    return average < 0
+        ? "Running early by \(magnitude)ms on average."
+        : "Running late by \(magnitude)ms on average."
+}
 
 struct DrillResultsCard: View {
     let score: PhraseScore
@@ -138,12 +233,8 @@ struct DrillResultsCard: View {
 
             HStack(spacing: 8) {
                 CountBadge(label: "Caught", value: score.hits, tint: Theme.Color.speedGreen)
-                CountBadge(label: "Missed", value: score.misses, tint: Color(hex: 0xFF5F5F))
-                CountBadge(
-                    label: "Stray",
-                    value: score.falsePositives,
-                    tint: Color(hex: 0xFFD93B)
-                )
+                CountBadge(label: "Missed", value: score.misses, tint: DrillPalette.error)
+                CountBadge(label: "Stray", value: score.falsePositives, tint: DrillPalette.stray)
             }
 
             if let average = score.averageOffsetMs {
@@ -155,17 +246,63 @@ struct DrillResultsCard: View {
         .padding(14)
         .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Metrics.cornerRadius))
     }
+}
 
-    /// Sign is the coaching cue: a consistent bias is a fixable habit,
-    /// whereas noise around zero just means the count is loose.
-    private func timingSummary(_ average: Double) -> String {
-        let magnitude = Int(abs(average).rounded())
-        if magnitude < 25 {
-            return "Dead on the phrase — average \(magnitude)ms off."
+/// Results for Tap the Beat.
+///
+/// Every tap lands within half a beat of *some* beat, so caught-versus-
+/// missed says little here. What matters is how tight the taps were, so
+/// the headline is the share of beats caught cleanly and the badges are the
+/// same timing buckets Practice's step-timing mode uses — one vocabulary
+/// for "on the beat" across the app.
+struct BeatTapResultsCard: View {
+    let score: PhraseScore
+    let onRetry: () -> Void
+
+    private var buckets: BucketCounts {
+        StepTimingStats.bucketCounts(score.offsetsMs.map { StepTap(time: 0, offsetMs: $0) })
+    }
+
+    /// Perfect and good hits over every beat that was there to catch.
+    private var onBeatPercent: Int {
+        let beats = score.hits + score.misses
+        guard beats > 0 else { return 0 }
+        return Int((Double(buckets.perfect + buckets.good) / Double(beats) * 100).rounded())
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("\(onBeatPercent)%")
+                    .font(.system(size: 44, weight: .black, design: .rounded))
+                    .foregroundStyle(Theme.Color.accent)
+                Text("on the beat")
+                    .font(Theme.Font.caption)
+                    .foregroundStyle(Theme.Color.textSecondary)
+                Spacer()
+                Button("Again", action: onRetry)
+                    .font(.system(.footnote, design: .rounded, weight: .semibold))
+                    .foregroundStyle(Theme.Color.accent)
+            }
+
+            HStack(spacing: 8) {
+                CountBadge(label: "Perfect", value: buckets.perfect, tint: StepRating.perfect.color)
+                CountBadge(label: "Good", value: buckets.good, tint: StepRating.good.color)
+                CountBadge(label: "Off", value: buckets.off, tint: StepRating.off.color)
+                if score.misses > 0 {
+                    CountBadge(label: "Missed", value: score.misses, tint: DrillPalette.error)
+                }
+                if score.falsePositives > 0 {
+                    CountBadge(label: "Extra", value: score.falsePositives, tint: DrillPalette.stray)
+                }
+            }
+
+            Text(score.averageOffsetMs.map(timingSummary) ?? "No taps landed on a beat.")
+                .font(Theme.Font.caption)
+                .foregroundStyle(Theme.Color.textSecondary)
         }
-        return average < 0
-            ? "Running early by \(magnitude)ms on average."
-            : "Running late by \(magnitude)ms on average."
+        .padding(14)
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Metrics.cornerRadius))
     }
 }
 
@@ -200,7 +337,7 @@ struct FindTheOneCard: View {
             HStack {
                 Label(headline, systemImage: result.landedOnOne ? "checkmark.circle.fill" : "xmark.circle.fill")
                     .font(.system(.title3, design: .rounded, weight: .bold))
-                    .foregroundStyle(result.landedOnOne ? Theme.Color.speedGreen : Color(hex: 0xFF5F5F))
+                    .foregroundStyle(result.landedOnOne ? Theme.Color.speedGreen : DrillPalette.error)
                 Spacer()
                 Button("Again", action: onRetry)
                     .font(.system(.footnote, design: .rounded, weight: .semibold))
@@ -262,14 +399,25 @@ struct DrillPanel: View {
             if run.plan != nil, run.phase != .idle {
                 PhraseRibbon(states: slotStates)
             }
+            if run.phase == .running, exercise.isContinuous {
+                TapFeedbackLabel(feedback: run.lastFeedback, exercise: exercise, tapCount: run.taps.count)
+            }
             tapTarget
             if let planError = run.planError {
                 Text(planError)
                     .font(Theme.Font.caption)
-                    .foregroundStyle(Color(hex: 0xFF5F5F))
+                    .foregroundStyle(DrillPalette.error)
             }
             results
         }
+    }
+
+    /// The pad flashes in the colour of what the tap just earned. The
+    /// parent grades the tap synchronously inside `onTap`, so by the time
+    /// the flash renders `run.lastFeedback` is already the new one.
+    private var flashColor: Color {
+        guard let feedback = run.lastFeedback else { return Theme.Color.speedGreen }
+        return feedback.isHit ? feedback.rating.color : DrillPalette.error
     }
 
     @ViewBuilder
@@ -277,8 +425,10 @@ struct DrillPanel: View {
         if run.phase == .running {
             BigTapTarget(
                 title: "Tap",
-                subtitle: exercise == .findTheOne ? "on beat 1" : "on every 1 of the phrase",
+                subtitle: exercise.tapPrompt,
                 isEnabled: true,
+                flashColor: flashColor,
+                hapticOnTap: false,
                 onTap: onTap
             )
         } else {
@@ -296,7 +446,11 @@ struct DrillPanel: View {
         if let oneShot = run.oneShot {
             FindTheOneCard(result: oneShot, onRetry: onStart)
         } else if let score = run.score {
-            DrillResultsCard(score: score, onRetry: onStart)
+            if exercise.gradesEveryBeat {
+                BeatTapResultsCard(score: score, onRetry: onStart)
+            } else {
+                DrillResultsCard(score: score, onRetry: onStart)
+            }
         }
     }
 }

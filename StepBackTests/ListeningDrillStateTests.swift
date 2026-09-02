@@ -68,7 +68,53 @@ final class ListeningDrillStateTests: XCTestCase {
         XCTAssertEqual(state.taps, [4], "finished drill must ignore taps")
     }
 
+    func testRecordTapKeepsTheLatestFeedback() {
+        var state = ListeningDrillState()
+        state.begin(plan: plan)
+        XCTAssertNil(state.lastFeedback)
+
+        let first = TapFeedback(offsetMs: 30, isHit: true)
+        state.recordTap(at: 4.03, feedback: first)
+        XCTAssertEqual(state.lastFeedback, first)
+
+        let second = TapFeedback(offsetMs: -300, isHit: false)
+        state.recordTap(at: 7.7, feedback: second)
+        XCTAssertEqual(state.lastFeedback, second)
+        XCTAssertEqual(state.taps, [4.03, 7.7])
+    }
+
+    func testBeginClearsTheLastFeedback() {
+        var state = ListeningDrillState()
+        state.begin(plan: plan)
+        state.recordTap(at: 4, feedback: TapFeedback(offsetMs: 0, isHit: true))
+        state.finish(toleranceSeconds: 0.2)
+
+        state.begin(plan: plan)
+        XCTAssertNil(state.lastFeedback, "feedback from the last take must not greet the new one")
+    }
+
     // MARK: - Finishing
+
+    func testFinishGradesAgainstTheTargetsNotThePhraseStarts() {
+        // Tap the Beat: two phrases, every beat a target.
+        let everyBeat = ListeningDrillPlan(
+            playbackStart: 0,
+            scoredStarts: [4, 8],
+            targets: [4, 5, 6, 7, 8, 9, 10, 11],
+            revealUntil: 4,
+            endTime: 11.45
+        )
+        var state = ListeningDrillState()
+        state.begin(plan: everyBeat)
+        for beat in [4.0, 5.1, 6.0, 7.0, 8.0, 9.0] {
+            state.recordTap(at: beat)
+        }
+        state.finish(toleranceSeconds: 0.2)
+
+        XCTAssertEqual(state.score?.hits, 6)
+        XCTAssertEqual(state.score?.misses, 2)
+        XCTAssertEqual(state.score?.falsePositives, 0)
+    }
 
     func testFinishGradesAgainstThePlan() {
         var state = ListeningDrillState()
@@ -105,6 +151,38 @@ final class ListeningDrillStateTests: XCTestCase {
         state.answer(FindTheOneResult(offsetMs: 0, measurePosition: 1))
         XCTAssertNil(state.oneShot)
         XCTAssertEqual(state.phase, .idle)
+    }
+
+    // MARK: - Ribbon
+
+    func testSlotStatesColourEachTargetByItsNearestTap() {
+        var state = ListeningDrillState()
+        state.begin(plan: plan)
+        state.recordTap(at: 4.03)
+        state.recordTap(at: 8.1)
+
+        XCTAssertEqual(
+            state.slotStates(at: 9.0, toleranceSeconds: 0.2),
+            [.hit(.perfect), .hit(.good), .pending]
+        )
+        // Once the window on 12 has closed with no tap, it's a miss.
+        XCTAssertEqual(state.slotStates(at: 12.5, toleranceSeconds: 0.2).last, .missed)
+    }
+
+    func testSlotStatesReadTheNearestTapSoADoubleTapColoursOneCell() {
+        var state = ListeningDrillState()
+        state.begin(plan: plan)
+        state.recordTap(at: 3.96)
+        state.recordTap(at: 4.15)
+        XCTAssertEqual(
+            state.slotStates(at: 5, toleranceSeconds: 0.2).first,
+            .hit(.perfect),
+            "the closer tap (−40ms) wins over the stray second one"
+        )
+    }
+
+    func testSlotStatesAreEmptyWithoutAPlan() {
+        XCTAssertEqual(ListeningDrillState().slotStates(at: 0, toleranceSeconds: 0.2), [])
     }
 
     // MARK: - Running out

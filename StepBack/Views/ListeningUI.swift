@@ -193,24 +193,32 @@ private struct TransportButton: View {
 
 /// Always-present correction for the auto-placed downbeat.
 ///
-/// The anchor is a guess from kick energy and will sometimes sit a beat
-/// off. Nudging is offered permanently rather than behind a setup step, so
-/// a wrong count costs one tap instead of a trip through a settings screen.
+/// The anchor is a guess and will sometimes sit off. Nudging is offered
+/// permanently rather than behind a setup step, so a wrong count costs one
+/// tap instead of a trip through a settings screen.
+///
+/// Three strides, because the guess can be wrong at three scales and each
+/// is a different fix: a beat (the bar line is off), four beats (the bar is
+/// right but "1" is really "5" — the 8-count is flipped) and eight beats
+/// (the 8 is right but the phrase turns over on a different 8). Fixing an
+/// off-by-four with single-beat arrows takes four taps and the knowledge
+/// that four is what you need — exactly what someone still learning to
+/// hear the count doesn't have.
 struct AnchorNudgeBar: View {
     let hasAnchor: Bool
     let onShift: (Int) -> Void
     let onTapBeatOne: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text(hasAnchor ? "Count off?" : "No count yet")
-                .font(Theme.Font.caption)
-                .foregroundStyle(Theme.Color.textTertiary)
+        HStack(alignment: .center, spacing: 12) {
             if hasAnchor {
-                NudgeButton(systemName: "arrow.left") { onShift(-1) }
-                    .accessibilityLabel("Shift beat 1 back")
-                NudgeButton(systemName: "arrow.right") { onShift(1) }
-                    .accessibilityLabel("Shift beat 1 forward")
+                NudgePair(caption: "beat", unit: "one beat", step: 1, onShift: onShift)
+                NudgePair(caption: "8-count", unit: "four beats", step: 4, onShift: onShift)
+                NudgePair(caption: "phrase", unit: "one 8-count", step: 8, onShift: onShift)
+            } else {
+                Text("No count yet")
+                    .font(Theme.Font.caption)
+                    .foregroundStyle(Theme.Color.textTertiary)
             }
             Spacer()
             Button(action: onTapBeatOne) {
@@ -219,6 +227,29 @@ struct AnchorNudgeBar: View {
                     .foregroundStyle(Theme.Color.accent)
             }
             .buttonStyle(.plain)
+        }
+    }
+}
+
+/// Back/forward arrows for one nudge stride, captioned with what they move.
+private struct NudgePair: View {
+    let caption: String
+    /// Spoken form of the stride, for the accessibility labels.
+    let unit: String
+    let step: Int
+    let onShift: (Int) -> Void
+
+    var body: some View {
+        VStack(spacing: 3) {
+            HStack(spacing: 2) {
+                NudgeButton(systemName: "chevron.left") { onShift(-step) }
+                    .accessibilityLabel("Shift beat 1 back \(unit)")
+                NudgeButton(systemName: "chevron.right") { onShift(step) }
+                    .accessibilityLabel("Shift beat 1 forward \(unit)")
+            }
+            Text(caption)
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(Theme.Color.textTertiary)
         }
     }
 }
@@ -236,6 +267,29 @@ private struct NudgeButton: View {
                 .background(Theme.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Overflow menu
+
+/// The player's ⋯ menu. Re-detection lives here rather than on the face of
+/// the player: it is a repair, not a control, and the anchor nudges already
+/// cover the everyday case. Disabled while an analysis is running so two
+/// can't race for the same clip.
+struct ListeningMoreMenu: View {
+    let isAnalyzing: Bool
+    let onRedetect: () -> Void
+
+    var body: some View {
+        Menu {
+            Button(action: onRedetect) {
+                Label("Re-detect beats", systemImage: "waveform.badge.magnifyingglass")
+            }
+            .disabled(isAnalyzing)
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .accessibilityLabel("More")
     }
 }
 

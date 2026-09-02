@@ -106,6 +106,50 @@ final class ListeningDrillPlanTests: XCTestCase {
         )
     }
 
+    // MARK: - Every-beat targets
+
+    /// Half-second beats under the four-second phrases.
+    private let beats: [Double] = (0..<48).map { Double($0) * 0.5 }
+
+    private func everyBeat(scored: Int = 2) -> DrillShape {
+        DrillShape(leadPhrases: 1, scoredPhrases: scored, toleranceSeconds: 0.2, gradesEveryBeat: true)
+    }
+
+    func testTargetsAreThePhraseStartsUnlessAskedForEveryBeat() {
+        let plan = ListeningDrillPlanner.plan(
+            phraseStarts: phrases, startIndex: 0, shape: shape(), duration: 100, beatTimes: beats
+        )
+        XCTAssertEqual(plan?.targets, plan?.scoredStarts)
+    }
+
+    func testEveryBeatTargetsCoverTheScoredPhrasesOnly() {
+        let plan = ListeningDrillPlanner.plan(
+            phraseStarts: phrases, startIndex: 0, shape: everyBeat(), duration: 100, beatTimes: beats
+        )
+        // Scored phrases start at 4 and 8; the window runs up to the phrase
+        // at 12, exclusive — sixteen beats.
+        XCTAssertEqual(plan?.scoredStarts, [4, 8])
+        XCTAssertEqual(plan?.targets, (8..<24).map { Double($0) * 0.5 })
+        // The take ends after the last *beat*, not the last phrase start.
+        XCTAssertEqual(plan?.endTime ?? 0, 11.5 + 0.2 + 0.25, accuracy: 1e-9)
+    }
+
+    func testEveryBeatWindowRunsToTheClipWhenNoPhraseFollows() {
+        // Start at 3: scored 16 and 20, nothing after 20, so the window
+        // ends at the clip.
+        let plan = ListeningDrillPlanner.plan(
+            phraseStarts: phrases, startIndex: 3, shape: everyBeat(scored: 3), duration: 22, beatTimes: beats
+        )
+        XCTAssertEqual(plan?.targets, (32..<44).map { Double($0) * 0.5 })
+    }
+
+    func testEveryBeatFallsBackToPhraseStartsWithoutAGrid() {
+        let plan = ListeningDrillPlanner.plan(
+            phraseStarts: phrases, startIndex: 0, shape: everyBeat(), duration: 100, beatTimes: []
+        )
+        XCTAssertEqual(plan?.targets, [4, 8])
+    }
+
     func testRandomPlanIsNilWhenNoStartIsViable() {
         XCTAssertNil(
             ListeningDrillPlanner.randomPlan(

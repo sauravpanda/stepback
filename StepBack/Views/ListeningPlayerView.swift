@@ -15,11 +15,11 @@ import SwiftUI
 struct ListeningPlayerView: View {
 
     /// Beats per phrase for transport and looping. A full 32-count phrase is
-    /// the unit dancers navigate by.
-    static let phraseLength = 32
+    /// the unit dancers navigate by — and the unit the detector anchors on.
+    static let phraseLength = PhraseAnchor.phraseLength
     /// The counter reads in 8s. That repeats four times inside a phrase, so
     /// it helps without giving the phrase boundary away.
-    static let countLength = 8
+    static let countLength = PhraseAnchor.countLength
 
     let clip: DanceClip
 
@@ -34,7 +34,9 @@ struct ListeningPlayerView: View {
     @State private var clickTrackURL: URL?
     @State private var isSwitchingAudio = false
     @State private var drillsShown = false
-    @State private var exercise: ListeningExercise = .phraseCatcher
+    /// Opens on the bottom rung of the ladder: someone who can't yet hear
+    /// the beat should meet the beat first, not the phrase.
+    @State private var exercise: ListeningExercise = .tapTheBeat
     @State private var run = ListeningDrillState()
     @State private var revealPhrases: Int = 2
 
@@ -77,7 +79,7 @@ struct ListeningPlayerView: View {
                     DrillPanel(
                         exercise: exercise,
                         run: run,
-                        slotStates: run.plan.map(slotStates(for:)) ?? [],
+                        slotStates: run.slotStates(at: vm.currentTime, toleranceSeconds: tolerance),
                         revealPhrases: $revealPhrases,
                         onSelectExercise: { newValue in
                             exercise = newValue
@@ -101,6 +103,13 @@ struct ListeningPlayerView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.Color.background, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                ListeningMoreMenu(isAnalyzing: vm.isAnalyzingBeats) {
+                    Task { await redetectBeats() }
+                }
+            }
+        }
         .keepScreenAwake()
         .task { await prepare() }
         .onDisappear {
@@ -298,21 +307,11 @@ private extension ListeningPlayerView {
         guard drillsShown, run.phase == .running else { return true }
         switch exercise {
         case .findTheOne: return false
-        case .phraseCatcher: return true
+        case .tapTheBeat, .phraseCatcher: return true
         case .countItOut: return run.plan.map { vm.currentTime < $0.revealUntil } ?? true
         }
     }
 
-    func slotStates(for plan: ListeningDrillPlan) -> [PhraseSlotState] {
-        let now = vm.currentTime
-        let window = tolerance
-        return plan.scoredStarts.map { start in
-            if run.taps.contains(where: { abs($0 - start) <= window }) {
-                return .hit
-            }
-            return now > start + window ? .missed : .pending
-        }
-    }
 }
 
 // MARK: - Loading and analysis
@@ -331,6 +330,22 @@ private extension ListeningPlayerView {
             try? modelContext.save()
         }
         configureBeatPulse()
+    }
+
+    /// Throws the cached grid away and analyses again.
+    ///
+    /// Analysis is cached for good on first open, so a clip analysed by an
+    /// older detector keeps its old grid forever unless asked. The loop and
+    /// any running drill were built on the old grid, so they go too; the
+    /// click is re-cut on the new one.
+    func redetectBeats() async {
+        run.reset()
+        vm.clearLoop()
+        await vm.redetectBeats(for: clip) {
+            try? modelContext.save()
+        }
+        configureBeatPulse()
+        await refreshClickTrackIfOn()
     }
 
     func configureBeatPulse() {
@@ -473,7 +488,8 @@ private extension ListeningPlayerView {
               let shifted = PhraseGrid.shiftAnchor(
                   anchor,
                   byBeats: beats,
-                  in: clip.beatTimes
+                  in: clip.beatTimes,
+                  keepingPhaseOf: Self.phraseLength
               ) else { return }
         clip.firstDownbeatSeconds = shifted
         try? modelContext.save()
@@ -511,12 +527,14 @@ private extension ListeningPlayerView {
         let shape = DrillShape(
             leadPhrases: exercise == .countItOut ? revealPhrases : 1,
             scoredPhrases: exercise.lengthInPhrases ?? 1,
-            toleranceSeconds: tolerance
+            toleranceSeconds: tolerance,
+            gradesEveryBeat: exercise.gradesEveryBeat
         )
         guard let plan = ListeningDrillPlanner.randomPlan(
             phraseStarts: starts,
             shape: shape,
-            duration: vm.duration
+            duration: vm.duration,
+            beatTimes: clip.beatTimes
         ) else {
             run.fail("This clip is too short for a \(exercise.title) take. Try a longer one.")
             return
@@ -539,27 +557,36 @@ private extension ListeningPlayerView {
         vm.play()
     }
 
+    /// Grades the tap the moment it lands — feedback and haptic together —
+    /// then records it for the end-of-take score.
     func recordDrillTap() {
         if exercise == .findTheOne {
             answerFindTheOne()
         } else {
-            run.recordTap(at: vm.precisePlaybackTime)
+            let time = vm.precisePlaybackTime
+            let feedback = PhraseGrid.feedback(
+                forTap: time,
+                targets: run.plan?.targets ?? [],
+                toleranceSeconds: tolerance
+            )
+            run.recordTap(at: time, feedback: feedback)
+            DrillHaptics.play(for: feedback)
         }
     }
 
     func answerFindTheOne() {
         let time = vm.precisePlaybackTime
         vm.pause()
-        run.answer(
-            FindTheOneResult(
-                offsetMs: BeatGrid.offsetMs(from: time, toNearestBeatIn: clip.beatTimes) ?? 0,
-                measurePosition: BeatGrid.currentMeasurePosition(
-                    currentTime: time,
-                    beatTimes: clip.beatTimes,
-                    anchor: clip.firstDownbeatSeconds,
-                    beatsPerMeasure: max(1, clip.beatsPerMeasure)
-                )
+        let result = FindTheOneResult(
+            offsetMs: BeatGrid.offsetMs(from: time, toNearestBeatIn: clip.beatTimes) ?? 0,
+            measurePosition: BeatGrid.currentMeasurePosition(
+                currentTime: time,
+                beatTimes: clip.beatTimes,
+                anchor: clip.firstDownbeatSeconds,
+                beatsPerMeasure: max(1, clip.beatsPerMeasure)
             )
         )
+        run.answer(result)
+        DrillHaptics.play(for: TapFeedback(offsetMs: result.offsetMs, isHit: result.landedOnOne))
     }
 }
