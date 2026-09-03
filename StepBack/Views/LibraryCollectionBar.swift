@@ -11,12 +11,15 @@ enum LibraryCollection: Hashable {
     case all
     case favorites
     case album(UUID)
+    /// Clips that aren't in any album — the pile still to be filed.
+    case unfiled
 
     func contains(_ clip: DanceClip) -> Bool {
         switch self {
         case .all: true
         case .favorites: clip.isFavorite
         case .album(let id): clip.tags.contains { $0.id == id }
+        case .unfiled: clip.tags.isEmpty
         }
     }
 
@@ -27,12 +30,14 @@ enum LibraryCollection: Hashable {
         case .all: nil
         case .favorites: "No favorites yet. Open a clip's ⋯ menu and choose Favorite."
         case .album: "Nothing in this album yet. Add clips from their ⋯ menu, or Select and Move."
+        case .unfiled: "Everything is in an album."
         }
     }
 }
 
-/// The row of collections under the Library title: All, Favorites, then
-/// one chip per album, each with its count. Tapping a chip shows just that
+/// The row of collections under the Library title: All, Favorites, one
+/// chip per album, and — only while there are any — the clips not yet in
+/// an album. Each shows its count. Tapping a chip shows just that
 /// collection; tapping it again does nothing, because there's always
 /// exactly one collection showing.
 struct LibraryCollectionBar: View {
@@ -53,6 +58,14 @@ struct LibraryCollectionBar: View {
                 ForEach(albums) { album in
                     chip(.album(album.id), label: album.name, tint: Color(tagHex: album.colorHex)) {
                         Circle().frame(width: 8, height: 8)
+                    }
+                }
+                // Last, after the albums you made: the pile still to file.
+                // Hidden once it's empty, so a tidy library isn't nagged.
+                if selected == .unfiled || clips.contains(where: LibraryCollection.unfiled.contains) {
+                    chip(.unfiled, label: "No album", tint: Theme.Color.speedCyan) {
+                        Image(systemName: "tray")
+                            .font(.system(size: 10, weight: .bold))
                     }
                 }
             }

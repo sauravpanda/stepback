@@ -59,6 +59,27 @@ final class LibraryCollectionTests: XCTestCase {
         XCTAssertFalse(album.contains(inNeither))
     }
 
+    func testUnfiledContainsOnlyClipsInNoAlbum() {
+        let blues = Tag(name: "Blues", colorHex: "#5FE7FF")
+        context.insert(blues)
+        let filed = clip("filed", in: blues)
+        let loose = clip("loose")
+        let looseFavorite = clip("loose favorite", favorite: true)
+
+        XCTAssertFalse(LibraryCollection.unfiled.contains(filed))
+        XCTAssertTrue(LibraryCollection.unfiled.contains(loose))
+        XCTAssertTrue(LibraryCollection.unfiled.contains(looseFavorite), "favourites still need filing")
+    }
+
+    func testFilingAClipDropsItFromUnfiled() {
+        let blues = Tag(name: "Blues", colorHex: "#5FE7FF")
+        context.insert(blues)
+        let loose = clip("loose")
+        XCTAssertTrue(LibraryCollection.unfiled.contains(loose))
+        loose.tags.append(blues)
+        XCTAssertFalse(LibraryCollection.unfiled.contains(loose))
+    }
+
     func testUnfavoritingDropsAClipFromFavorites() {
         let starred = clip("starred", favorite: true)
         starred.isFavorite = false
@@ -71,6 +92,7 @@ final class LibraryCollectionTests: XCTestCase {
         XCTAssertNil(LibraryCollection.all.emptyHint)
         XCTAssertNotNil(LibraryCollection.favorites.emptyHint)
         XCTAssertNotNil(LibraryCollection.album(UUID()).emptyHint)
+        XCTAssertNotNil(LibraryCollection.unfiled.emptyHint)
     }
 
     func testIsFavoritePersistsAcrossSave() throws {
