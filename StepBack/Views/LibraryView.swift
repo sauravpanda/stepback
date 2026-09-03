@@ -60,6 +60,7 @@ struct LibraryView: View {
                 .task {
                     _ = await photosService.requestAuthorization()
                     backfillCloudIdentifiers()
+                    removeLegacyEventAlbums()
                 }
                 .sheet(isPresented: $settingsPresented) {
                     SettingsView()
@@ -315,37 +316,15 @@ struct LibraryView: View {
         if imported == 0, importError == nil {
             importError = "No clips imported. Make sure you picked videos, not photos."
         }
-        if imported > 0 {
-            applyAutoTags()
-        }
     }
 
-    /// Re-runs event clustering over all clips and attaches the resulting
-    /// \`Event: …\` tags. Existing tags are reused by name; new ones are
-    /// inserted. Clips already in the right cluster are left alone.
-    private func applyAutoTags() {
-        let allClips = clips.sorted { $0.dateAdded < $1.dateAdded }
-        let clusters = AutoTagService.cluster(dates: allClips.map(\.dateAdded))
-        for cluster in clusters {
-            let tag = findOrCreateTag(name: cluster.tagName, colorHex: cluster.colorHex)
-            for idx in cluster.indices {
-                let clip = allClips[idx]
-                if !clip.tags.contains(where: { $0.id == tag.id }) {
-                    clip.tags.append(tag)
-                }
-            }
+    /// The importer used to cluster clips by date into "Event: …" albums.
+    /// Nothing creates them any more; this clears out any that are left.
+    /// Idempotent, so it's safe to run on every visit.
+    private func removeLegacyEventAlbums() {
+        if LegacyEventAlbums.remove(from: tags, in: modelContext) > 0 {
+            try? modelContext.save()
         }
-        try? modelContext.save()
-    }
-
-    private func findOrCreateTag(name: String, colorHex: String) -> Tag {
-        let descriptor = FetchDescriptor<Tag>(predicate: #Predicate { $0.name == name })
-        if let existing = try? modelContext.fetch(descriptor).first {
-            return existing
-        }
-        let tag = Tag(name: name, colorHex: colorHex)
-        modelContext.insert(tag)
-        return tag
     }
 
     private func importOne(_ item: PhotosPickerItem) async throws {
