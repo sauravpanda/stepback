@@ -109,10 +109,11 @@ struct LibraryView: View {
             VStack(spacing: 0) {
                 LibraryCollectionBar(albums: tags, clips: clips, selected: $collection)
                 LibrarySummaryBar(shown: filteredClips, total: clips.count)
-                ScrollView {
-                    if filteredClips.isEmpty, let hint = collection.emptyHint {
-                        LibraryCollectionEmptyState(hint: hint)
-                    } else {
+                if filteredClips.isEmpty, let hint = collection.emptyHint {
+                    LibraryCollectionEmptyState(hint: hint)
+                    Spacer()
+                } else {
+                    ScrollView {
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(filteredClips) { clip in
                                 clipCell(for: clip)
@@ -502,13 +503,21 @@ private struct LibraryCell: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// The image is drawn as an overlay on a clear view sized to the cell
+    /// rather than laid out directly: a `scaledToFill` image reports its
+    /// *filled* size (wider than the cell for landscape video) up to the
+    /// grid, which then lets it spill over its neighbours. The clear base
+    /// only ever reports the cell's own size, and `clipped` trims the
+    /// overflow to it.
     @ViewBuilder
     private var thumbnail: some View {
         if let data = clip.thumbnailData, let uiImage = UIImage(data: data) {
-            Image(uiImage: uiImage)
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Color.clear
+                .overlay {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                }
                 .clipped()
         } else {
             Image(systemName: "film")
