@@ -51,7 +51,7 @@ StepBack/
     CompareView.swift            Side-by-side synced playback
   Services/
     PhotosService.swift          PHAsset -> AVURLAsset, thumbnails
-    AutoTagService.swift         Cluster clips by time -> events
+    LegacyEventAlbums.swift      Removes the old auto "Event:" albums
     PracticePlayerViewModel.swift Playback state, loop, speed, step timing
     BeatDetector.swift           Onset envelope + tempo autocorrelation
     AIServices.swift             Pose tracking stubs (v2)
