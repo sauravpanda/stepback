@@ -7,6 +7,11 @@ import UIKit
 struct PracticeView: View {
 
     let clip: DanceClip
+    /// The clips either side of this one in the list it was opened from,
+    /// so a swipe on the video moves on without a trip back to the Library.
+    let neighbors: ClipNeighbors
+    /// Asked to show a neighbour after a swipe; the caller owns navigation.
+    let onOpenNeighbor: ((DanceClip, PlayerSwipe.Direction) -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @StateObject private var vm: PracticePlayerViewModel
@@ -23,8 +28,14 @@ struct PracticeView: View {
     @State private var poseDebug: Bool = false
     @StateObject private var poseCoordinator: PoseStreamCoordinator
 
-    init(clip: DanceClip) {
+    init(
+        clip: DanceClip,
+        neighbors: ClipNeighbors = .none,
+        onOpenNeighbor: ((DanceClip, PlayerSwipe.Direction) -> Void)? = nil
+    ) {
         self.clip = clip
+        self.neighbors = neighbors
+        self.onOpenNeighbor = onOpenNeighbor
         // Share a single AVPlayer between the view model and the pose
         // coordinator so the coordinator's video output reads frames from
         // the *same* item the user is watching.
@@ -214,7 +225,8 @@ struct PracticeView: View {
                 // height and float beneath.
                 ZoomablePlayerContainer(
                     onSingleTap: { vm.togglePlayPause() },
-                    onLongPressLocated: { fraction in pinDancer(atContainerFraction: fraction) }
+                    onLongPressLocated: { fraction in pinDancer(atContainerFraction: fraction) },
+                    onSwipe: openNeighbor
                 ) {
                     // Rotation: size the surface to axis-swapped bounds for
                     // 90°/270° so the rotated result aspect-fits the
@@ -622,6 +634,16 @@ extension PracticeView {
     fileprivate func deleteSegment(_ segment: ClipSegment) {
         modelContext.delete(segment)
         try? modelContext.save()
+    }
+
+    /// A swipe on the video: move to the neighbour in that direction, if
+    /// there is one. At either end of the list the swipe does nothing, and
+    /// the absence of the usual tick says why.
+    fileprivate func openNeighbor(_ direction: PlayerSwipe.Direction) {
+        let target = direction == .toNext ? neighbors.next : neighbors.previous
+        guard let target, let onOpenNeighbor else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        onOpenNeighbor(target, direction)
     }
 
     fileprivate func detectBeats() async {

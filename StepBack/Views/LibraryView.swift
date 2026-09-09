@@ -14,6 +14,11 @@ struct LibraryView: View {
     @State private var importState: ImportState = .idle
     @State private var importError: String?
     @State private var collection: LibraryCollection = .all
+    /// The clip open in the player. Swiping the video swaps it in place, so
+    /// the player is driven by state rather than a `NavigationLink` per cell.
+    @State private var openedClip: DanceClip?
+    /// Which edge the next player slides in from, set by the swipe.
+    @State private var swipeEdge: Edge = .trailing
 
     @State private var editingClip: DanceClip?
     @State private var isSelecting: Bool = false
@@ -39,6 +44,25 @@ struct LibraryView: View {
                 .toolbarBackground(Theme.Color.background, for: .navigationBar)
                 .toolbarColorScheme(.dark, for: .navigationBar)
                 .toolbar { toolbar }
+                .navigationDestination(
+                    isPresented: Binding(
+                        get: { openedClip != nil },
+                        set: { if !$0 { openedClip = nil } }
+                    )
+                ) {
+                    if let clip = openedClip {
+                        // Keyed by clip so a swipe builds a fresh player for
+                        // the neighbour; the push transition carries it in
+                        // from the side the finger came from.
+                        PracticeView(
+                            clip: clip,
+                            neighbors: ClipNeighbors(of: clip, in: filteredClips),
+                            onOpenNeighbor: openNeighbor
+                        )
+                        .id(clip.id)
+                        .transition(.push(from: swipeEdge))
+                    }
+                }
                 .alert(
                     "Import failed",
                     isPresented: .init(
@@ -145,8 +169,8 @@ struct LibraryView: View {
             }
             .buttonStyle(.plain)
         } else {
-            NavigationLink {
-                PracticeView(clip: clip)
+            Button {
+                openedClip = clip
             } label: {
                 LibraryCell(
                     clip: clip,
@@ -157,6 +181,13 @@ struct LibraryView: View {
                 )
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    private func openNeighbor(_ clip: DanceClip, _ direction: PlayerSwipe.Direction) {
+        swipeEdge = direction == .toNext ? .trailing : .leading
+        withAnimation(.easeInOut(duration: 0.28)) {
+            openedClip = clip
         }
     }
 
