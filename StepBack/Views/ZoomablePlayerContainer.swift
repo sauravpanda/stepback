@@ -15,14 +15,19 @@ struct ZoomablePlayerContainer<Content: View>: View {
     /// so callers can map it back through their own letterbox/rotation to
     /// image space. Used for "hold a dancer to track them."
     private let onLongPressLocated: ((CGPoint) -> Void)?
+    /// A horizontal swipe on the un-zoomed video. Zoomed, the same drag
+    /// pans the picture instead, so it never fires then.
+    private let onSwipe: ((PlayerSwipe.Direction) -> Void)?
 
     init(
         onSingleTap: (() -> Void)? = nil,
         onLongPressLocated: ((CGPoint) -> Void)? = nil,
+        onSwipe: ((PlayerSwipe.Direction) -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.onSingleTap = onSingleTap
         self.onLongPressLocated = onLongPressLocated
+        self.onSwipe = onSwipe
         self.content = content()
     }
 
@@ -134,8 +139,14 @@ struct ZoomablePlayerContainer<Content: View>: View {
                 )
                 offset = clampedOffset(proposed, for: scale, in: size)
             }
-            .onEnded { _ in
+            .onEnded { value in
                 baseOffset = offset
+                if let direction = PlayerSwipe.direction(
+                    for: value.translation,
+                    isZoomed: scale > minScale + 0.01
+                ) {
+                    onSwipe?(direction)
+                }
             }
     }
 
