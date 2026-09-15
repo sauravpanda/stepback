@@ -12,6 +12,9 @@ struct PracticeView: View {
     let neighbors: ClipNeighbors
     /// Asked to show a neighbour after a swipe; the caller owns navigation.
     let onOpenNeighbor: ((DanceClip, PlayerSwipe.Direction) -> Void)?
+    /// Start playing as soon as the clip has loaded. Set when the clip was
+    /// swiped to: moving on shouldn't also mean pressing play again.
+    let autoplay: Bool
 
     @Environment(\.modelContext) private var modelContext
     @StateObject private var vm: PracticePlayerViewModel
@@ -31,11 +34,13 @@ struct PracticeView: View {
     init(
         clip: DanceClip,
         neighbors: ClipNeighbors = .none,
-        onOpenNeighbor: ((DanceClip, PlayerSwipe.Direction) -> Void)? = nil
+        onOpenNeighbor: ((DanceClip, PlayerSwipe.Direction) -> Void)? = nil,
+        autoplay: Bool = false
     ) {
         self.clip = clip
         self.neighbors = neighbors
         self.onOpenNeighbor = onOpenNeighbor
+        self.autoplay = autoplay
         // Share a single AVPlayer between the view model and the pose
         // coordinator so the coordinator's video output reads frames from
         // the *same* item the user is watching.
@@ -145,6 +150,9 @@ struct PracticeView: View {
         .task {
             await vm.load()
             configureBeatPulse()
+            if autoplay, vm.isReady {
+                vm.play()
+            }
         }
         .onChange(of: clip.beatTimesData) { _, _ in
             // Re-arm the boundary observer when beats are (re-)detected so

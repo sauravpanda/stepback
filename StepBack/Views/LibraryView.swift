@@ -19,6 +19,9 @@ struct LibraryView: View {
     @State private var openedClip: DanceClip?
     /// Which edge the next player slides in from, set by the swipe.
     @State private var swipeEdge: Edge = .trailing
+    /// Whether the open clip was reached by swiping. A swiped-to clip starts
+    /// playing on its own; a tapped one waits for play, as it always has.
+    @State private var autoplayOpened = false
 
     @State private var editingClip: DanceClip?
     @State private var isSelecting: Bool = false
@@ -57,7 +60,8 @@ struct LibraryView: View {
                         PracticeView(
                             clip: clip,
                             neighbors: ClipNeighbors(of: clip, in: filteredClips),
-                            onOpenNeighbor: openNeighbor
+                            onOpenNeighbor: openNeighbor,
+                            autoplay: autoplayOpened
                         )
                         .id(clip.id)
                         .transition(.push(from: swipeEdge))
@@ -170,6 +174,7 @@ struct LibraryView: View {
             .buttonStyle(.plain)
         } else {
             Button {
+                autoplayOpened = false
                 openedClip = clip
             } label: {
                 LibraryCell(
@@ -186,6 +191,7 @@ struct LibraryView: View {
 
     private func openNeighbor(_ clip: DanceClip, _ direction: PlayerSwipe.Direction) {
         swipeEdge = direction == .toNext ? .trailing : .leading
+        autoplayOpened = true
         withAnimation(.easeInOut(duration: 0.28)) {
             openedClip = clip
         }
