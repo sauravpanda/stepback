@@ -19,6 +19,9 @@ final class PracticePlayerViewModel: ObservableObject {
     /// video. Display-only — the underlying asset and pose detection are
     /// untouched; the view rotates the surface and un-rotates touches.
     @Published private(set) var rotationQuarterTurns: Int = 0
+    /// The picture's oriented size, so overlays can find the letterboxed
+    /// frame inside the player area. Zero until the asset has loaded.
+    @Published private(set) var videoSize: CGSize = .zero
 
     @Published private(set) var isAnalyzingBeats: Bool = false
     @Published var analysisError: String?
@@ -532,6 +535,11 @@ extension PracticePlayerViewModel {
             }
             sourceAsset = urlAsset
             let loadedDuration = try await urlAsset.load(.duration).seconds
+            if let track = try? await urlAsset.loadTracks(withMediaType: .video).first,
+               let natural = try? await track.load(.naturalSize),
+               let transform = try? await track.load(.preferredTransform) {
+                videoSize = VideoFrame.orientedSize(naturalSize: natural, preferredTransform: transform)
+            }
             let item = AVPlayerItem(asset: urlAsset)
             item.audioTimePitchAlgorithm = .timeDomain
             player.replaceCurrentItem(with: item)

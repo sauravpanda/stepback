@@ -32,6 +32,9 @@ struct PracticeView: View {
     /// Beats and phrase changes drawn over the video. A habit rather than a
     /// per-clip fact, so it's remembered across clips.
     @AppStorage(SettingsKeys.beatOverlay) private var beatOverlayOn = false
+    /// The Trim / Save-pattern row. Off by default: it cost a row of the
+    /// video's height on every clip for two actions most sessions never use.
+    @AppStorage(SettingsKeys.showTrimTools) private var showTrimTools = false
     @StateObject private var poseCoordinator: PoseStreamCoordinator
 
     init(
@@ -280,9 +283,23 @@ struct PracticeView: View {
                         .padding(.top, 10)
                     }
                 }
-                .overlay(alignment: .bottom) {
+                .overlay {
+                    // Pinned to the bottom of the *picture*, not the player
+                    // area: a landscape clip on a portrait phone is a band
+                    // across the middle, and an overlay at the area's edge
+                    // would sit in the black beneath it.
                     if beatOverlayOn, clip.hasBeatAnalysis {
-                        PracticeBeatOverlay(vm: vm, clip: clip)
+                        GeometryReader { geo in
+                            let frame = VideoFrame.aspectFitRect(
+                                videoSize: vm.videoSize,
+                                in: geo.size,
+                                quarterTurns: vm.rotationQuarterTurns
+                            )
+                            PracticeBeatOverlay(vm: vm, clip: clip)
+                                .frame(width: frame.width, height: frame.height, alignment: .bottom)
+                                .position(x: frame.midX, y: frame.midY)
+                        }
+                        .allowsHitTesting(false)
                     }
                 }
                 .overlay(alignment: .topTrailing) {
@@ -562,7 +579,14 @@ struct PracticeView: View {
     /// for everyone else. The trim icon was buried in the top toolbar with
     /// no label. Promoting both to labeled pills here makes the two main
     /// "edit this clip" actions obvious from the practice surface.
+    @ViewBuilder
     private var actionRow: some View {
+        if showTrimTools {
+            actionRowContent
+        }
+    }
+
+    private var actionRowContent: some View {
         HStack(spacing: 8) {
             ActionPill(
                 title: "Trim",
