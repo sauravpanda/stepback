@@ -9,6 +9,8 @@ enum SettingsKeys {
     /// Whether the Practice player draws beats and phrase changes over the
     /// video. Remembered across clips for the same reason as the count.
     static let beatOverlay = "beatOverlayOnVideo"
+    /// Whether the Practice player shows the Trim and Save-pattern row.
+    static let showTrimTools = "showTrimTools"
 }
 
 /// App settings: whether imports copy video bytes into the sandbox, plus a
@@ -20,6 +22,7 @@ struct SettingsView: View {
     @Query private var clips: [DanceClip]
 
     @AppStorage(SettingsKeys.keepLocalCopies) private var keepLocalCopies = false
+    @AppStorage(SettingsKeys.showTrimTools) private var showTrimTools = false
 
     @State private var copiesBytes: Int64 = 0
     @State private var removeCopiesConfirmation = false
@@ -43,6 +46,12 @@ struct SettingsView: View {
                         survive Photos deletions.
                         """
                     )
+                }
+
+                Section {
+                    Toggle("Show trim and pattern tools", isOn: $showTrimTools)
+                } footer: {
+                    Text("Adds the Trim and Save-pattern row under the scrubber in Practice. Off gives the video more room.")
                 }
 
                 if !clipsWithCopies.isEmpty {
