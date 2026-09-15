@@ -6,6 +6,9 @@ enum SettingsKeys {
     /// How finely the Listen tab counts — a habit rather than a per-clip
     /// fact, so it is a preference rather than a stored model attribute.
     static let countSubdivision = "countSubdivision"
+    /// Whether the Practice player draws beats and phrase changes over the
+    /// video. Remembered across clips for the same reason as the count.
+    static let beatOverlay = "beatOverlayOnVideo"
 }
 
 /// App settings: whether imports copy video bytes into the sandbox, plus a

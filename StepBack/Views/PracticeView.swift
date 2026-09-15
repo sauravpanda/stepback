@@ -29,6 +29,9 @@ struct PracticeView: View {
     /// Debug: ring every detected person so hops are diagnosable from a
     /// screen recording.
     @State private var poseDebug: Bool = false
+    /// Beats and phrase changes drawn over the video. A habit rather than a
+    /// per-clip fact, so it's remembered across clips.
+    @AppStorage(SettingsKeys.beatOverlay) private var beatOverlayOn = false
     @StateObject private var poseCoordinator: PoseStreamCoordinator
 
     init(
@@ -275,6 +278,33 @@ struct PracticeView: View {
                         }
                         .padding(.leading, 10)
                         .padding(.top, 10)
+                    }
+                }
+                .overlay(alignment: .bottom) {
+                    if beatOverlayOn, clip.hasBeatAnalysis {
+                        PracticeBeatOverlay(vm: vm, clip: clip)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    // On the video rather than in the control stack: it
+                    // stays reachable with the controls hidden, and the BPM
+                    // row has no room for another chip.
+                    if clip.hasBeatAnalysis {
+                        Button {
+                            beatOverlayOn.toggle()
+                        } label: {
+                            Image(systemName: "waveform.path.ecg")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(beatOverlayOn ? .black : Theme.Color.textPrimary)
+                                .frame(width: 34, height: 34)
+                                .background(
+                                    beatOverlayOn ? Theme.Color.accent : Color.black.opacity(0.55),
+                                    in: Circle()
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(beatOverlayOn ? "Hide beats on video" : "Show beats on video")
+                        .padding(10)
                     }
                 }
 

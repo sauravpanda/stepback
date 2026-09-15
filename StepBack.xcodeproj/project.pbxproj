@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		00216C193FEECCCE9300D9F2 /* ListeningDrillPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C41251F23DE0A3E271BDB8 /* ListeningDrillPlan.swift */; };
+		00CB2E4E5BD2CEA8F12B25E3 /* BeatLaneTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3118A1A4EBE31994D9FB2748 /* BeatLaneTests.swift */; };
 		03C973FD27336E9DD2EDE507 /* PracticeBeatUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC6BAE20433D2ED45F00AD41 /* PracticeBeatUI.swift */; };
 		098DA938E40292AA4E5238C5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018D2C7BF9E56956DC2D3202 /* SettingsView.swift */; };
 		0D16A4ECF9075D8853C9E93A /* ListeningDrillStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CA903EF426C5859033A9B7 /* ListeningDrillStateTests.swift */; };
@@ -35,6 +36,7 @@
 		5F405BD1B2F2EB7F30970683 /* LibraryFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4B3FD6B0A004C787FC243B /* LibraryFormatterTests.swift */; };
 		61CF9C7EABDA7AF4C9FE3991 /* PoseSmoother.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B555006BB3DDAF7885AA331 /* PoseSmoother.swift */; };
 		622A6663058E88A57B465B62 /* StepTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0265ABC8E91AF4657EB95F83 /* StepTiming.swift */; };
+		62DAD9FA37838E4A66DD60C0 /* BeatOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA151BA5B6CF15DEFBB78A80 /* BeatOverlay.swift */; };
 		648013A1A4C23692CD6ED03B /* OriginalImportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF4094CC2957462A284F735A /* OriginalImportServiceTests.swift */; };
 		68001CEE8D7EEE9810B87D35 /* ClipNeighbors.swift in Sources */ = {isa = PBXBuildFile; fileRef = D93505AA75211FD9C2DAEA99 /* ClipNeighbors.swift */; };
 		691A3AE86C110C252A1412FE /* BeatGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078CB839E392E788201DD665 /* BeatGrid.swift */; };
@@ -122,6 +124,7 @@
 		2AE253F68F99B73CECC1093C /* CountSubdivisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountSubdivisionTests.swift; sourceTree = "<group>"; };
 		2D07843122196F5F0DA539D1 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		2F4DFD4BD4CDB5948FD76055 /* ListeningExercise.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningExercise.swift; sourceTree = "<group>"; };
+		3118A1A4EBE31994D9FB2748 /* BeatLaneTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatLaneTests.swift; sourceTree = "<group>"; };
 		35AE6C8D6564306E1B0ADA20 /* PracticeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeView.swift; sourceTree = "<group>"; };
 		3689FBA12EEC8A3CCA08789F /* ListeningExerciseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningExerciseTests.swift; sourceTree = "<group>"; };
 		46242480BEBB0CDD9B45F158 /* NowPlayingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingController.swift; sourceTree = "<group>"; };
@@ -196,6 +199,7 @@
 		ED02929698766149F5A683B1 /* PoseCoordinateTransformTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoseCoordinateTransformTests.swift; sourceTree = "<group>"; };
 		EF4094CC2957462A284F735A /* OriginalImportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OriginalImportServiceTests.swift; sourceTree = "<group>"; };
 		F6BC077A9FA8B51D07C178A0 /* BeatDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatDetectorTests.swift; sourceTree = "<group>"; };
+		FA151BA5B6CF15DEFBB78A80 /* BeatOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatOverlay.swift; sourceTree = "<group>"; };
 		FD5428E68F5C9683BC6034A1 /* LegacyEventAlbumsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyEventAlbumsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -221,6 +225,7 @@
 		2BAE89F5B3212B0E382D6904 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				FA151BA5B6CF15DEFBB78A80 /* BeatOverlay.swift */,
 				8D25E6771271EDD5B867F61E /* ClipEditView.swift */,
 				89049437E63D50C5452D5760 /* DrillUI.swift */,
 				646B79AFE3D853E8CD3B075B /* LibraryCollectionBar.swift */,
@@ -249,6 +254,7 @@
 				47E1C9AD49F4D12FB2C708BB /* BeatDetectorPhraseTests.swift */,
 				F6BC077A9FA8B51D07C178A0 /* BeatDetectorTests.swift */,
 				7093A077C0A2C139BD7BDD29 /* BeatGridTests.swift */,
+				3118A1A4EBE31994D9FB2748 /* BeatLaneTests.swift */,
 				092716ED66E68AFE39612D8E /* BeatTrackerTests.swift */,
 				7671E959BF4EEE0C34242433 /* ClipNeighborsTests.swift */,
 				2AE253F68F99B73CECC1093C /* CountSubdivisionTests.swift */,
@@ -451,6 +457,7 @@
 				B3B9F9B136E6A83FE41D1546 /* BeatDetector+Spectral.swift in Sources */,
 				E9E06DF791FF47015B3DDFA8 /* BeatDetector.swift in Sources */,
 				691A3AE86C110C252A1412FE /* BeatGrid.swift in Sources */,
+				62DAD9FA37838E4A66DD60C0 /* BeatOverlay.swift in Sources */,
 				1DF8E7A68F21F0BC7376716F /* BeatTracker.swift in Sources */,
 				1D0BE1897582A939153E6CE8 /* ClipEditView.swift in Sources */,
 				68001CEE8D7EEE9810B87D35 /* ClipNeighbors.swift in Sources */,
@@ -509,6 +516,7 @@
 				FD9F3EEB30E4080165D26B5A /* BeatDetectorPhraseTests.swift in Sources */,
 				76D520F6EC5A0A8E57C8AAA1 /* BeatDetectorTests.swift in Sources */,
 				DA0EE94353A18DA75824D7A8 /* BeatGridTests.swift in Sources */,
+				00CB2E4E5BD2CEA8F12B25E3 /* BeatLaneTests.swift in Sources */,
 				256483E74779AD1F7B19E927 /* BeatTrackerTests.swift in Sources */,
 				F5530818F299ECC11363DE3B /* ClipNeighborsTests.swift in Sources */,
 				57DC3A5B49F0B0B6E6AB27E4 /* CountSubdivisionTests.swift in Sources */,
