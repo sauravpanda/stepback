@@ -164,6 +164,22 @@ final class BeatTrackerTests: XCTestCase {
         }
     }
 
+    func testLatticeKeepsAFirstBeatJustBeforeTheStart() {
+        // The fit says the first beat is 10ms before 0:00. That's the beat
+        // the count starts on; keep it, clamped to the start.
+        let lattice = BeatTracker.Lattice(firstBeat: -0.01, period: 0.5)
+        let times = lattice.times(covering: 0...1.2)
+        XCTAssertEqual(times.count, 3)
+        XCTAssertEqual(times[0], 0, accuracy: 1e-9)
+        XCTAssertEqual(times[1], 0.49, accuracy: 1e-9)
+        XCTAssertEqual(times[2], 0.99, accuracy: 1e-9)
+    }
+
+    func testLatticeDropsABeatWellBeforeTheStart() {
+        let lattice = BeatTracker.Lattice(firstBeat: -0.2, period: 0.5)
+        XCTAssertEqual(lattice.times(covering: 0...1.0).first ?? -1, 0.3, accuracy: 1e-9)
+    }
+
     // MARK: - Extension
 
     func testExtendedFillsBothEnds() {

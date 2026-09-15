@@ -71,7 +71,9 @@ final class BeatDetectorTests: XCTestCase {
         // A produced track deserves a grid with no frame jitter: once the
         // tracked beats fit a constant tempo, every interval is identical.
         let analysis = BeatDetector.analyzeSamples(clickTrack(bpm: 128, duration: 20), sampleRate: sampleRate)
-        let intervals = zip(analysis.beatTimes.dropFirst(), analysis.beatTimes).map { $0 - $1 }
+        // The first interval is excluded: a fitted first beat a few ms before
+        // 0:00 is kept and clamped to 0:00, which shortens that one gap.
+        let intervals = zip(analysis.beatTimes.dropFirst(), analysis.beatTimes).map { $0 - $1 }.dropFirst()
         guard let first = intervals.first else { return XCTFail("no beats") }
         for interval in intervals {
             XCTAssertEqual(interval, first, accuracy: 1e-6)

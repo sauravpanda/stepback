@@ -217,13 +217,19 @@ enum BeatTracker {
         let firstBeat: Double
         let period: Double
 
+        /// A grid point this close before the range still counts, clamped
+        /// to its edge: the fit can put a song's first beat a few
+        /// milliseconds before 0:00, and dropping it loses the very beat
+        /// the count starts on.
+        static let edgeTolerance: Double = 0.05
+
         /// Every grid point inside `range`, in order.
         func times(covering range: ClosedRange<Double>) -> [Double] {
             guard period > 0 else { return [] }
-            let first = Int(((range.lowerBound - firstBeat) / period).rounded(.up))
+            let first = Int(((range.lowerBound - Self.edgeTolerance - firstBeat) / period).rounded(.up))
             let last = Int(((range.upperBound - firstBeat) / period).rounded(.down))
             guard last >= first else { return [] }
-            return (first...last).map { firstBeat + Double($0) * period }
+            return (first...last).map { max(range.lowerBound, firstBeat + Double($0) * period) }
         }
     }
 
