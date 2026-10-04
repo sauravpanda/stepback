@@ -1,5 +1,5 @@
-@testable import StepBack
 import CoreGraphics
+@testable import StepBack
 import Vision
 import XCTest
 
@@ -30,12 +30,12 @@ final class PoseSmootherTests: XCTestCase {
         XCTAssertEqual(output.joints.first?.confidence ?? -1, 0.42, accuracy: 1e-6)
     }
 
-    func testJointsSmoothedIndependently() {
+    func testJointsSmoothedIndependently() throws {
         var smoother = PoseSmoother(minCutoff: 1.0, beta: 0.0)
         _ = smoother.smooth(
             pose([
-                (.leftWrist, CGPoint(x: 0.0, y: 0.0)),
-                (.rightWrist, CGPoint(x: 1.0, y: 1.0)),
+                (.leftWrist, CGPoint.zero),
+                (.rightWrist, CGPoint(x: 1.0, y: 1.0))
             ]),
             timestamp: 0
         )
@@ -44,12 +44,12 @@ final class PoseSmootherTests: XCTestCase {
         let out = smoother.smooth(
             pose([
                 (.leftWrist, CGPoint(x: 0.5, y: 0.5)),
-                (.rightWrist, CGPoint(x: 1.0, y: 1.0)),
+                (.rightWrist, CGPoint(x: 1.0, y: 1.0))
             ]),
             timestamp: 0.06
         )
-        let left = out.joints.first { $0.name == .leftWrist }!
-        let right = out.joints.first { $0.name == .rightWrist }!
+        let left = try XCTUnwrap(out.joints.first { $0.name == .leftWrist })
+        let right = try XCTUnwrap(out.joints.first { $0.name == .rightWrist })
         // Left lags toward its new position (smoothed, so strictly between).
         XCTAssertGreaterThan(left.normalizedPosition.x, 0.0)
         XCTAssertLessThan(left.normalizedPosition.x, 0.5)
@@ -58,7 +58,7 @@ final class PoseSmootherTests: XCTestCase {
         XCTAssertEqual(right.normalizedPosition.y, 1.0, accuracy: 1e-9)
     }
 
-    func testLargeTimeGapResetsAndPassesThrough() {
+    func testLargeTimeGapResetsAndPassesThrough() throws {
         var smoother = PoseSmoother(resetGap: 0.4)
         _ = smoother.smooth(pose([(.nose, CGPoint(x: 0.1, y: 0.1))]), timestamp: 0)
         // Jump well past resetGap — treated as a seek, so the new pose
@@ -67,7 +67,7 @@ final class PoseSmootherTests: XCTestCase {
             pose([(.nose, CGPoint(x: 0.9, y: 0.9))]),
             timestamp: 5.0
         )
-        let nose = out.joints.first!
+        let nose = try XCTUnwrap(out.joints.first)
         XCTAssertEqual(nose.normalizedPosition.x, 0.9, accuracy: 1e-9)
         XCTAssertEqual(nose.normalizedPosition.y, 0.9, accuracy: 1e-9)
     }
@@ -82,7 +82,7 @@ final class PoseSmootherTests: XCTestCase {
         XCTAssertEqual(out.joints.first?.normalizedPosition.x ?? -1, 0.8, accuracy: 1e-9)
     }
 
-    func testNewlyAppearingJointPassesThroughOnFirstSight() {
+    func testNewlyAppearingJointPassesThroughOnFirstSight() throws {
         var smoother = PoseSmoother(minCutoff: 1.0, beta: 0.0)
         _ = smoother.smooth(pose([(.leftWrist, CGPoint(x: 0.2, y: 0.2))]), timestamp: 0)
         // rightWrist shows up for the first time on the second frame — it
@@ -90,11 +90,11 @@ final class PoseSmootherTests: XCTestCase {
         let out = smoother.smooth(
             pose([
                 (.leftWrist, CGPoint(x: 0.2, y: 0.2)),
-                (.rightWrist, CGPoint(x: 0.8, y: 0.6)),
+                (.rightWrist, CGPoint(x: 0.8, y: 0.6))
             ]),
             timestamp: 0.06
         )
-        let right = out.joints.first { $0.name == .rightWrist }!
+        let right = try XCTUnwrap(out.joints.first { $0.name == .rightWrist })
         XCTAssertEqual(right.normalizedPosition.x, 0.8, accuracy: 1e-9)
         XCTAssertEqual(right.normalizedPosition.y, 0.6, accuracy: 1e-9)
     }

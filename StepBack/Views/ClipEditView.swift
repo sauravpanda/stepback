@@ -220,6 +220,8 @@ struct BulkMoveToGroupView: View {
 }
 
 #Preview {
+    // Force-try is allowed in #Preview code (see CONTRIBUTING.md).
+    // swiftlint:disable:next force_try
     let container = try! ModelContainer(
         for: DanceClip.self, Tag.self, ClipSegment.self,
         configurations: .init(isStoredInMemoryOnly: true)

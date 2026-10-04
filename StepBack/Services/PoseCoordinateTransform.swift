@@ -78,12 +78,12 @@ enum PoseCoordinateTransform {
     /// container so it lives in the same fractional space. Flips Y back.
     /// Returns nil if the fraction falls outside the letterboxed video.
     static func normalizedImagePoint(
-        containerFraction f: CGPoint,
+        containerFraction fraction: CGPoint,
         unitDisplayRect: CGRect
     ) -> CGPoint? {
         guard unitDisplayRect.width > 0, unitDisplayRect.height > 0 else { return nil }
-        let nx = (f.x - unitDisplayRect.minX) / unitDisplayRect.width
-        let nyTop = (f.y - unitDisplayRect.minY) / unitDisplayRect.height
+        let nx = (fraction.x - unitDisplayRect.minX) / unitDisplayRect.width
+        let nyTop = (fraction.y - unitDisplayRect.minY) / unitDisplayRect.height
         guard (0...1).contains(nx), (0...1).contains(nyTop) else { return nil }
         let imageY = 1 - nyTop  // flip to Vision's bottom-left origin
         return CGPoint(x: nx, y: imageY)
@@ -96,16 +96,16 @@ enum PoseCoordinateTransform {
     /// applying `rotationEffect` — the display rotates one way, so touches
     /// rotate back the other.
     static func unrotatedFraction(
-        _ f: CGPoint,
+        _ fraction: CGPoint,
         quarterTurns: Int
     ) -> CGPoint {
         // Normalize to 0…3; Swift's % keeps the sign of the dividend.
         let turns = ((quarterTurns % 4) + 4) % 4
         switch turns {
-        case 1: return CGPoint(x: f.y, y: 1 - f.x)      // undo 90° CW
-        case 2: return CGPoint(x: 1 - f.x, y: 1 - f.y)  // undo 180°
-        case 3: return CGPoint(x: 1 - f.y, y: f.x)      // undo 270° CW
-        default: return f
+        case 1: return CGPoint(x: fraction.y, y: 1 - fraction.x)      // undo 90° CW
+        case 2: return CGPoint(x: 1 - fraction.x, y: 1 - fraction.y)  // undo 180°
+        case 3: return CGPoint(x: 1 - fraction.y, y: fraction.x)      // undo 270° CW
+        default: return fraction
         }
     }
 }

@@ -1,6 +1,6 @@
-@testable import StepBack
 import CoreGraphics
 import ImageIO
+@testable import StepBack
 import XCTest
 
 final class PoseOrientationTests: XCTestCase {
@@ -17,17 +17,17 @@ final class PoseOrientationTests: XCTestCase {
     func testRotate90ClockwiseIsRight() {
         // iPhone-shot portrait videos land here. Storage buffer is
         // landscape, displayed portrait by rotating 90° CW.
-        let t = CGAffineTransform(rotationAngle: .pi / 2)
+        let transform = CGAffineTransform(rotationAngle: .pi / 2)
         XCTAssertEqual(
-            CGImagePropertyOrientation(transform: t),
+            CGImagePropertyOrientation(transform: transform),
             .right
         )
     }
 
     func testRotate180IsDown() {
-        let t = CGAffineTransform(rotationAngle: .pi)
+        let transform = CGAffineTransform(rotationAngle: .pi)
         XCTAssertEqual(
-            CGImagePropertyOrientation(transform: t),
+            CGImagePropertyOrientation(transform: transform),
             .down
         )
     }
@@ -35,17 +35,17 @@ final class PoseOrientationTests: XCTestCase {
     func testRotateNegative180IsDown() {
         // atan2 returns -π for a 180° rotation when entered as -π.
         // Both should map to .down.
-        let t = CGAffineTransform(rotationAngle: -.pi)
+        let transform = CGAffineTransform(rotationAngle: -.pi)
         XCTAssertEqual(
-            CGImagePropertyOrientation(transform: t),
+            CGImagePropertyOrientation(transform: transform),
             .down
         )
     }
 
     func testRotate90CounterclockwiseIsLeft() {
-        let t = CGAffineTransform(rotationAngle: -.pi / 2)
+        let transform = CGAffineTransform(rotationAngle: -.pi / 2)
         XCTAssertEqual(
-            CGImagePropertyOrientation(transform: t),
+            CGImagePropertyOrientation(transform: transform),
             .left
         )
     }
@@ -54,9 +54,9 @@ final class PoseOrientationTests: XCTestCase {
         // A non-90° rotation isn't something we expect from AVAsset's
         // preferredTransform, but if we ever get one the pipeline should
         // degrade gracefully — Vision still mostly works on .up sources.
-        let t = CGAffineTransform(rotationAngle: .pi / 3)  // 60°
+        let transform = CGAffineTransform(rotationAngle: .pi / 3)  // 60°
         XCTAssertEqual(
-            CGImagePropertyOrientation(transform: t),
+            CGImagePropertyOrientation(transform: transform),
             .up
         )
     }
