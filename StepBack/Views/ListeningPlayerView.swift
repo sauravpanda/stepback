@@ -162,7 +162,6 @@ struct ListeningPlayerView: View {
             .frame(height: 30)
             PhraseCounter(
                 position: countPosition(at: time),
-                spoken: spokenCount(at: time),
                 phraseLength: Self.countLength,
                 isRevealed: counterRevealed,
                 pulseID: vm.beatPulseID
@@ -267,19 +266,6 @@ private extension ListeningPlayerView {
 
     var subdivision: CountSubdivision {
         CountSubdivision(rawValue: subdivisionRaw) ?? .quarter
-    }
-
-    /// What the counter says right now. On the beat that's its number; in
-    /// between it's the subdivision syllable.
-    func spokenCount(at time: Double) -> String? {
-        guard let beat = countPosition(at: time) else { return nil }
-        guard subdivision != .quarter else { return "\(beat)" }
-        guard let slot = PhraseGrid.subdivisionIndex(
-            currentTime: time,
-            beatTimes: clip.beatTimes,
-            perBeat: subdivision.perBeat
-        ) else { return "\(beat)" }
-        return subdivision.spoken(beat: beat, index: slot)
     }
 
     /// Which slot inside the beat the playhead is in, for the count row.

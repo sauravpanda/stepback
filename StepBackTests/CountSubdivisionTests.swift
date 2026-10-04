@@ -11,54 +11,9 @@ final class CountSubdivisionTests: XCTestCase {
     func testSlotCountsPerBeat() {
         XCTAssertEqual(CountSubdivision.quarter.perBeat, 1)
         XCTAssertEqual(CountSubdivision.eighth.perBeat, 2)
+        XCTAssertEqual(CountSubdivision.swung.perBeat, 3)
         XCTAssertEqual(CountSubdivision.triplet.perBeat, 3)
         XCTAssertEqual(CountSubdivision.sixteenth.perBeat, 4)
-    }
-
-    func testEverySubdivisionNamesEverySlot() {
-        for subdivision in CountSubdivision.allCases {
-            XCTAssertEqual(
-                subdivision.syllables.count,
-                subdivision.perBeat,
-                "\(subdivision.rawValue) must name each of its slots"
-            )
-        }
-    }
-
-    // MARK: - Spoken counts
-
-    func testSlotZeroIsSpokenAsTheBeatNumber() {
-        XCTAssertEqual(CountSubdivision.sixteenth.spoken(beat: 3, index: 0), "3")
-        XCTAssertEqual(CountSubdivision.quarter.spoken(beat: 2, index: 0), "2")
-    }
-
-    func testSixteenthsCountOneEAndA() {
-        let sixteenth = CountSubdivision.sixteenth
-        XCTAssertEqual(
-            (0..<4).map { sixteenth.spoken(beat: 1, index: $0) },
-            ["1", "e", "&", "a"]
-        )
-    }
-
-    func testEighthsCountOneAnd() {
-        let eighth = CountSubdivision.eighth
-        XCTAssertEqual((0..<2).map { eighth.spoken(beat: 2, index: $0) }, ["2", "&"])
-    }
-
-    func testTripletsCountOneTripLet() {
-        let triplet = CountSubdivision.triplet
-        XCTAssertEqual(
-            (0..<3).map { triplet.spoken(beat: 4, index: $0) },
-            ["4", "trip", "let"]
-        )
-    }
-
-    func testSwungHoldsTheNumberThroughTheSilentAnd() {
-        let swung = CountSubdivision.swung
-        XCTAssertEqual(
-            (0..<3).map { swung.spoken(beat: 3, index: $0) },
-            ["3", "3", "a"]
-        )
     }
 
     func testOnlySwungHasASilentSlot() {
@@ -68,11 +23,6 @@ final class CountSubdivisionTests: XCTestCase {
             XCTAssertTrue(other.silentSlots.isEmpty, "\(other.rawValue) clicks every slot")
             XCTAssertNil(other.stepSlot)
         }
-    }
-
-    func testOutOfRangeSlotFallsBackToTheNumber() {
-        XCTAssertEqual(CountSubdivision.eighth.spoken(beat: 5, index: 9), "5")
-        XCTAssertEqual(CountSubdivision.eighth.spoken(beat: 5, index: -1), "5")
     }
 
     // MARK: - subdivisionIndex

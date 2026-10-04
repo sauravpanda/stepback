@@ -4,8 +4,9 @@ import Foundation
 ///
 /// Dancers don't only count "1 2 3 4" — a triple step lives on "1 & 2", a
 /// swung feel on "1 trip let", and tight footwork on "1 e & a". The count
-/// display and the metronome both read this, so choosing a subdivision
-/// changes what you see *and* what you hear.
+/// row's dots and the metronome both read this, so choosing a subdivision
+/// changes what you see *and* what you hear. The big counter deliberately
+/// does not: it stays on the beat number.
 ///
 /// `swung` is the WCS triple: the beat splits in three like `triplet`, but
 /// the middle third is silent, so what you hear and step is "1 . a 2" —
@@ -32,18 +33,6 @@ enum CountSubdivision: String, CaseIterable, Identifiable {
         }
     }
 
-    /// What each slot inside a beat is called. Index 0 is empty because the
-    /// downbeat of the beat is spoken as its number — "1", not "1 and".
-    var syllables: [String] {
-        switch self {
-        case .quarter: [""]
-        case .eighth: ["", "&"]
-        case .swung: ["", "&", "a"]
-        case .triplet: ["", "trip", "let"]
-        case .sixteenth: ["", "e", "&", "a"]
-        }
-    }
-
     /// Menu label, written the way it is counted.
     var label: String {
         switch self {
@@ -63,20 +52,6 @@ enum CountSubdivision: String, CaseIterable, Identifiable {
     /// The slot a triple step lands on between beats, if this count has one.
     var stepSlot: Int? {
         self == .swung ? 2 : nil
-    }
-
-    /// What to display for slot `index` of a beat numbered `beat`.
-    ///
-    /// Out-of-range indices fall back to the number rather than crashing or
-    /// showing nothing — a count display that blanks out is worse than one
-    /// that repeats itself. A silent slot holds the number too: in a swung
-    /// triple the first step lasts through the "&", and flashing "&" would
-    /// teach exactly the straight count this mode exists to unlearn.
-    func spoken(beat: Int, index: Int) -> String {
-        guard index > 0, index < syllables.count, !silentSlots.contains(index) else {
-            return "\(beat)"
-        }
-        return syllables[index]
     }
 }
 
