@@ -123,14 +123,14 @@ struct PoseOverlay: View {
         context: GraphicsContext
     ) {
         for joint in pose.joints {
-            let p = PoseCoordinateTransform.viewPoint(
+            let point = PoseCoordinateTransform.viewPoint(
                 normalizedImagePoint: joint.normalizedPosition,
                 displayRect: displayRect
             )
             let radius: CGFloat = 4
             let rect = CGRect(
-                x: p.x - radius,
-                y: p.y - radius,
+                x: point.x - radius,
+                y: point.y - radius,
                 width: radius * 2,
                 height: radius * 2
             )
@@ -208,8 +208,13 @@ struct PoseOverlay: View {
         )
 
         // CoM marker — a ringed dot so it stands apart from the white joints.
-        let r: CGFloat = 6
-        let comRect = CGRect(x: com.x - r, y: com.y - r, width: r * 2, height: r * 2)
+        let comRadius: CGFloat = 6
+        let comRect = CGRect(
+            x: com.x - comRadius,
+            y: com.y - comRadius,
+            width: comRadius * 2,
+            height: comRadius * 2
+        )
         context.fill(Path(ellipseIn: comRect), with: .color(tint))
         context.stroke(
             Path(ellipseIn: comRect.insetBy(dx: -2, dy: -2)),
@@ -236,13 +241,18 @@ struct PoseOverlay: View {
         context: GraphicsContext
     ) {
         for (index, candidate) in debugCandidates.enumerated() {
-            let c = PoseTracker.centroid(candidate)
-            let p = PoseCoordinateTransform.viewPoint(
-                normalizedImagePoint: c,
+            let centroid = PoseTracker.centroid(candidate)
+            let point = PoseCoordinateTransform.viewPoint(
+                normalizedImagePoint: centroid,
                 displayRect: displayRect
             )
-            let r: CGFloat = 14
-            let ring = CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)
+            let radius: CGFloat = 14
+            let ring = CGRect(
+                x: point.x - radius,
+                y: point.y - radius,
+                width: radius * 2,
+                height: radius * 2
+            )
             context.stroke(
                 Path(ellipseIn: ring),
                 with: .color(.cyan.opacity(0.9)),
@@ -252,7 +262,7 @@ struct PoseOverlay: View {
                 Text("\(index): \(candidate.joints.count)j")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.cyan),
-                at: CGPoint(x: p.x, y: p.y - r - 8)
+                at: CGPoint(x: point.x, y: point.y - radius - 8)
             )
         }
     }
@@ -277,7 +287,7 @@ struct PoseOverlay: View {
         SkeletonBone(start: .leftHip, end: .leftKnee, axis: .vertical),
         SkeletonBone(start: .leftKnee, end: .leftAnkle, axis: .vertical),
         SkeletonBone(start: .rightHip, end: .rightKnee, axis: .vertical),
-        SkeletonBone(start: .rightKnee, end: .rightAnkle, axis: .vertical),
+        SkeletonBone(start: .rightKnee, end: .rightAnkle, axis: .vertical)
     ]
 }
 
@@ -287,21 +297,21 @@ extension Color {
     /// read well on top of black-letterboxed video — pure RGB primaries
     /// look harsh, so we soften red and green slightly.
     static func stackingColor(for score: Double) -> Color {
-        let s = max(0, min(1, score))
-        if s >= 0.5 {
+        let clamped = max(0, min(1, score))
+        if clamped >= 0.5 {
             // Yellow → green
-            let t = (s - 0.5) * 2
+            let progress = (clamped - 0.5) * 2
             return Color(
-                red: 1.0 - 0.8 * t,
+                red: 1.0 - 0.8 * progress,
                 green: 0.85,
-                blue: 0.2 * t
+                blue: 0.2 * progress
             )
         } else {
             // Red → yellow
-            let t = s * 2
+            let progress = clamped * 2
             return Color(
                 red: 1.0,
-                green: 0.2 + 0.65 * t,
+                green: 0.2 + 0.65 * progress,
                 blue: 0.0
             )
         }

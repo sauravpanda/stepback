@@ -47,13 +47,13 @@ final class OneEuroFilterTests: XCTestCase {
         var filter = OneEuroFilter(minCutoff: 1.0, beta: 0.0)
         _ = filter.filter(0.0, timestamp: 0.0)
         var previous = 0.0
-        var t = 0.06
+        var timestamp = 0.06
         for _ in 0..<40 {
-            let out = filter.filter(1.0, timestamp: t)
+            let out = filter.filter(1.0, timestamp: timestamp)
             XCTAssertGreaterThanOrEqual(out, previous - accuracy, "should not move backward")
             XCTAssertLessThanOrEqual(out, 1.0 + accuracy, "should not overshoot")
             previous = out
-            t += 0.06
+            timestamp += 0.06
         }
         XCTAssertGreaterThan(previous, 0.9, "should converge close to the target")
     }
@@ -64,13 +64,13 @@ final class OneEuroFilterTests: XCTestCase {
         var filter = OneEuroFilter(minCutoff: 1.0, beta: 0.5)
         let mean = 0.5
         let amplitude = 0.02
-        var t = 0.0
+        var timestamp = 0.0
         var lastOutputs: [Double] = []
-        for i in 0..<40 {
-            let raw = mean + (i % 2 == 0 ? amplitude : -amplitude)
-            let out = filter.filter(raw, timestamp: t)
-            if i >= 30 { lastOutputs.append(out) }
-            t += 0.06
+        for frame in 0..<40 {
+            let raw = mean + (frame % 2 == 0 ? amplitude : -amplitude)
+            let out = filter.filter(raw, timestamp: timestamp)
+            if frame >= 30 { lastOutputs.append(out) }
+            timestamp += 0.06
         }
         let maxDeviation = lastOutputs.map { abs($0 - mean) }.max() ?? .infinity
         XCTAssertLessThan(

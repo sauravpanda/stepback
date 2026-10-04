@@ -37,33 +37,48 @@ final class PlayerSurfaceView: UIView {
     // nil-ing it lets the audio session keep going. Reattach on foreground so
     // the user sees frames again.
     private var stashedPlayer: AVPlayer?
+    /// Tokens for the background/foreground observers. Held so they can be
+    /// removed individually when the view leaves its window.
+    private var lifecycleObservers: [NSObjectProtocol] = []
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
         // Always clear first so re-parenting (didMoveToWindow can fire more
         // than once) never stacks duplicate observers.
-        NotificationCenter.default.removeObserver(self)
+        removeLifecycleObservers()
         guard window != nil else { return }
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(detachForBackground),
-            name: UIApplication.didEnterBackgroundNotification,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(reattachForForeground),
-            name: UIApplication.willEnterForegroundNotification,
-            object: nil
-        )
+        let center = NotificationCenter.default
+        lifecycleObservers = [
+            center.addObserver(
+                forName: UIApplication.didEnterBackgroundNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.detachForBackground() }
+            },
+            center.addObserver(
+                forName: UIApplication.willEnterForegroundNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.reattachForForeground() }
+            }
+        ]
     }
 
-    @objc private func detachForBackground() {
+    private func removeLifecycleObservers() {
+        for token in lifecycleObservers {
+            NotificationCenter.default.removeObserver(token)
+        }
+        lifecycleObservers = []
+    }
+
+    private func detachForBackground() {
         stashedPlayer = playerLayer.player
         playerLayer.player = nil
     }
 
-    @objc private func reattachForForeground() {
+    private func reattachForForeground() {
         if let stashedPlayer {
             playerLayer.player = stashedPlayer
         }
@@ -71,6 +86,8 @@ final class PlayerSurfaceView: UIView {
     }
 
     deinit {
-        NotificationCenter.default.removeObserver(self)
+        for token in lifecycleObservers {
+            NotificationCenter.default.removeObserver(token)
+        }
     }
 }

@@ -1,5 +1,5 @@
-@testable import StepBack
 import CoreGraphics
+@testable import StepBack
 import XCTest
 
 final class PoseCoordinateTransformTests: XCTestCase {
@@ -75,7 +75,7 @@ final class PoseCoordinateTransformTests: XCTestCase {
         // display rect of (10, 20)…(110, 220), bottom-left is (10, 220).
         let rect = CGRect(x: 10, y: 20, width: 100, height: 200)
         let result = PoseCoordinateTransform.viewPoint(
-            normalizedImagePoint: CGPoint(x: 0, y: 0),
+            normalizedImagePoint: CGPoint.zero,
             displayRect: rect
         )
         XCTAssertEqual(result.x, 10, accuracy: accuracy)
@@ -124,50 +124,50 @@ final class PoseCoordinateTransformTests: XCTestCase {
     // MARK: - unzoomedFraction
 
     func testUnzoomedFractionWithoutZoomIsLocationOverSize() {
-        let f = PoseCoordinateTransform.unzoomedFraction(
+        let fraction = PoseCoordinateTransform.unzoomedFraction(
             location: CGPoint(x: 100, y: 200),
             containerSize: CGSize(width: 400, height: 400),
             scale: 1,
             offset: .zero
         )
-        XCTAssertEqual(f.x, 0.25, accuracy: accuracy)
-        XCTAssertEqual(f.y, 0.5, accuracy: accuracy)
+        XCTAssertEqual(fraction.x, 0.25, accuracy: accuracy)
+        XCTAssertEqual(fraction.y, 0.5, accuracy: accuracy)
     }
 
     func testUnzoomedFractionUndoesCenterScale() {
         // At 2× zoom about center, a tap at the exact center still maps to
         // the content center (0.5, 0.5).
-        let f = PoseCoordinateTransform.unzoomedFraction(
+        let fraction = PoseCoordinateTransform.unzoomedFraction(
             location: CGPoint(x: 200, y: 200),
             containerSize: CGSize(width: 400, height: 400),
             scale: 2,
             offset: .zero
         )
-        XCTAssertEqual(f.x, 0.5, accuracy: accuracy)
-        XCTAssertEqual(f.y, 0.5, accuracy: accuracy)
+        XCTAssertEqual(fraction.x, 0.5, accuracy: accuracy)
+        XCTAssertEqual(fraction.y, 0.5, accuracy: accuracy)
     }
 
     func testUnzoomedFractionUndoesOffset() {
         // Pan the content right by 50; a tap at center now corresponds to a
         // content point left of center.
-        let f = PoseCoordinateTransform.unzoomedFraction(
+        let fraction = PoseCoordinateTransform.unzoomedFraction(
             location: CGPoint(x: 200, y: 200),
             containerSize: CGSize(width: 400, height: 400),
             scale: 1,
             offset: CGSize(width: 50, height: 0)
         )
-        XCTAssertEqual(f.x, (200.0 - 50.0) / 400.0, accuracy: accuracy)  // 0.375
-        XCTAssertEqual(f.y, 0.5, accuracy: accuracy)
+        XCTAssertEqual(fraction.x, (200.0 - 50.0) / 400.0, accuracy: accuracy)  // 0.375
+        XCTAssertEqual(fraction.y, 0.5, accuracy: accuracy)
     }
 
     func testUnzoomedFractionZeroContainerIsZero() {
-        let f = PoseCoordinateTransform.unzoomedFraction(
+        let fraction = PoseCoordinateTransform.unzoomedFraction(
             location: CGPoint(x: 10, y: 10),
             containerSize: .zero,
             scale: 1,
             offset: .zero
         )
-        XCTAssertEqual(f, .zero)
+        XCTAssertEqual(fraction, .zero)
     }
 
     // MARK: - normalizedImagePoint (inverse of viewPoint)
@@ -210,8 +210,8 @@ final class PoseCoordinateTransformTests: XCTestCase {
     // MARK: - unrotatedFraction (touch → pre-rotation content)
 
     func testUnrotatedFractionIdentityAtZeroTurns() {
-        let f = CGPoint(x: 0.2, y: 0.7)
-        XCTAssertEqual(PoseCoordinateTransform.unrotatedFraction(f, quarterTurns: 0), f)
+        let fraction = CGPoint(x: 0.2, y: 0.7)
+        XCTAssertEqual(PoseCoordinateTransform.unrotatedFraction(fraction, quarterTurns: 0), fraction)
     }
 
     func testUnrotatedFractionUndoes90Clockwise() {
@@ -261,14 +261,14 @@ final class PoseCoordinateTransformTests: XCTestCase {
     }
 
     func testUnrotatedFractionNormalizesOutOfRangeTurns() {
-        let f = CGPoint(x: 0.3, y: 0.2)
+        let fraction = CGPoint(x: 0.3, y: 0.2)
         XCTAssertEqual(
-            PoseCoordinateTransform.unrotatedFraction(f, quarterTurns: 5),
-            PoseCoordinateTransform.unrotatedFraction(f, quarterTurns: 1)
+            PoseCoordinateTransform.unrotatedFraction(fraction, quarterTurns: 5),
+            PoseCoordinateTransform.unrotatedFraction(fraction, quarterTurns: 1)
         )
         XCTAssertEqual(
-            PoseCoordinateTransform.unrotatedFraction(f, quarterTurns: -1),
-            PoseCoordinateTransform.unrotatedFraction(f, quarterTurns: 3)
+            PoseCoordinateTransform.unrotatedFraction(fraction, quarterTurns: -1),
+            PoseCoordinateTransform.unrotatedFraction(fraction, quarterTurns: 3)
         )
     }
 }
