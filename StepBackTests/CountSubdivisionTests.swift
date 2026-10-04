@@ -53,6 +53,23 @@ final class CountSubdivisionTests: XCTestCase {
         )
     }
 
+    func testSwungHoldsTheNumberThroughTheSilentAnd() {
+        let swung = CountSubdivision.swung
+        XCTAssertEqual(
+            (0..<3).map { swung.spoken(beat: 3, index: $0) },
+            ["3", "3", "a"]
+        )
+    }
+
+    func testOnlySwungHasASilentSlot() {
+        XCTAssertEqual(CountSubdivision.swung.silentSlots, [1])
+        XCTAssertEqual(CountSubdivision.swung.stepSlot, 2)
+        for other in CountSubdivision.allCases where other != .swung {
+            XCTAssertTrue(other.silentSlots.isEmpty, "\(other.rawValue) clicks every slot")
+            XCTAssertNil(other.stepSlot)
+        }
+    }
+
     func testOutOfRangeSlotFallsBackToTheNumber() {
         XCTAssertEqual(CountSubdivision.eighth.spoken(beat: 5, index: 9), "5")
         XCTAssertEqual(CountSubdivision.eighth.spoken(beat: 5, index: -1), "5")
@@ -154,5 +171,55 @@ final class CountSubdivisionTests: XCTestCase {
     func testSubdivideIsSafeOnATinyGrid() {
         XCTAssertEqual(PhraseGrid.subdivide(beatTimes: [], perBeat: 4), [])
         XCTAssertEqual(PhraseGrid.subdivide(beatTimes: [1], perBeat: 4), [1])
+    }
+
+    // MARK: - clickPlan
+
+    func testSwungClicksTheBeatAndTheLateA() {
+        let plan = PhraseGrid.clickPlan(
+            beatTimes: [0, 3, 6],
+            subdivision: .swung,
+            anchor: 0,
+            beatsPerMeasure: 4
+        )
+        // The "&" at 1 and 4 is dropped; the "a" sits two-thirds through.
+        XCTAssertEqual(plan.times, [0, 2, 3, 5, 6])
+        XCTAssertEqual(plan.subdivisions, [1, 3])
+        XCTAssertEqual(plan.downbeats, [0])
+    }
+
+    func testDroppingSilentSlotsKeepsDownbeatsOnTheBeat() {
+        let beats = (0...8).map(Double.init)
+        let plan = PhraseGrid.clickPlan(
+            beatTimes: beats,
+            subdivision: .swung,
+            anchor: 0,
+            beatsPerMeasure: 4
+        )
+        XCTAssertEqual(plan.downbeats.map { plan.times[$0] }.sorted(), [0, 4, 8])
+    }
+
+    func testSlotsBeforeTheAnchorKeepTheirRoles() {
+        let plan = PhraseGrid.clickPlan(
+            beatTimes: [0, 3, 6],
+            subdivision: .swung,
+            anchor: 3,
+            beatsPerMeasure: 4
+        )
+        XCTAssertEqual(plan.times, [0, 2, 3, 5, 6])
+        XCTAssertEqual(plan.subdivisions.map { plan.times[$0] }.sorted(), [2, 5])
+        XCTAssertEqual(plan.downbeats.map { plan.times[$0] }, [3])
+    }
+
+    func testEvenSubdivisionsClickEverySlot() {
+        let plan = PhraseGrid.clickPlan(
+            beatTimes: [0, 1, 2],
+            subdivision: .eighth,
+            anchor: 0,
+            beatsPerMeasure: 4
+        )
+        XCTAssertEqual(plan.times, [0, 0.5, 1, 1.5, 2])
+        XCTAssertEqual(plan.subdivisions, [1, 3])
+        XCTAssertEqual(plan.downbeats, [0])
     }
 }

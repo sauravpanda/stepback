@@ -6,9 +6,15 @@ import Foundation
 /// swung feel on "1 trip let", and tight footwork on "1 e & a". The count
 /// display and the metronome both read this, so choosing a subdivision
 /// changes what you see *and* what you hear.
+///
+/// `swung` is the WCS triple: the beat splits in three like `triplet`, but
+/// the middle third is silent, so what you hear and step is "1 . a 2" —
+/// a long step, then a short late "a" pulled toward the next beat. Its whole
+/// point is to stop the "a" drifting forward onto a straight "&".
 enum CountSubdivision: String, CaseIterable, Identifiable {
     case quarter
     case eighth
+    case swung
     case triplet
     case sixteenth
 
@@ -21,7 +27,7 @@ enum CountSubdivision: String, CaseIterable, Identifiable {
         switch self {
         case .quarter: 1
         case .eighth: 2
-        case .triplet: 3
+        case .swung, .triplet: 3
         case .sixteenth: 4
         }
     }
@@ -32,6 +38,7 @@ enum CountSubdivision: String, CaseIterable, Identifiable {
         switch self {
         case .quarter: [""]
         case .eighth: ["", "&"]
+        case .swung: ["", "&", "a"]
         case .triplet: ["", "trip", "let"]
         case .sixteenth: ["", "e", "&", "a"]
         }
@@ -42,20 +49,42 @@ enum CountSubdivision: String, CaseIterable, Identifiable {
         switch self {
         case .quarter: "1 2 3 4"
         case .eighth: "1 & 2 &"
+        case .swung: "1 (&) a 2"
         case .triplet: "1 trip let"
         case .sixteenth: "1 e & a"
         }
+    }
+
+    /// Slots that are counted in time but neither clicked nor stepped.
+    var silentSlots: Set<Int> {
+        self == .swung ? [1] : []
+    }
+
+    /// The slot a triple step lands on between beats, if this count has one.
+    var stepSlot: Int? {
+        self == .swung ? 2 : nil
     }
 
     /// What to display for slot `index` of a beat numbered `beat`.
     ///
     /// Out-of-range indices fall back to the number rather than crashing or
     /// showing nothing — a count display that blanks out is worse than one
-    /// that repeats itself.
+    /// that repeats itself. A silent slot holds the number too: in a swung
+    /// triple the first step lasts through the "&", and flashing "&" would
+    /// teach exactly the straight count this mode exists to unlearn.
     func spoken(beat: Int, index: Int) -> String {
-        guard index > 0, index < syllables.count else { return "\(beat)" }
+        guard index > 0, index < syllables.count, !silentSlots.contains(index) else {
+            return "\(beat)"
+        }
         return syllables[index]
     }
+}
+
+/// The clicks to mix for a subdivision, with each one's tier.
+struct ClickPlan: Equatable {
+    var times: [Double] = []
+    var downbeats: Set<Int> = []
+    var subdivisions: Set<Int> = []
 }
 
 extension PhraseGrid {
@@ -106,5 +135,40 @@ extension PhraseGrid {
             result.append(last)
         }
         return result
+    }
+
+    /// Lays out the metronome for `subdivision`: every slot of every beat
+    /// except the silent ones, with downbeats every `beatsPerMeasure` beats
+    /// counted from the click nearest `anchor`.
+    ///
+    /// Silent slots are dropped *after* tiers are assigned, so removing them
+    /// can't shift which click counts as the downbeat.
+    static func clickPlan(
+        beatTimes: [Double],
+        subdivision: CountSubdivision,
+        anchor: Double?,
+        beatsPerMeasure: Int
+    ) -> ClickPlan {
+        let perBeat = subdivision.perBeat
+        let slots = subdivide(beatTimes: beatTimes, perBeat: perBeat)
+        let measureStride = max(1, beatsPerMeasure) * perBeat
+        let anchorIndex = BeatGrid.nearestBeatIndex(to: anchor ?? 0, in: slots) ?? 0
+
+        var plan = ClickPlan()
+        for (index, time) in slots.enumerated() {
+            // Swift's % keeps the dividend's sign; fold it back into 0..<n
+            // so slots before the anchor are classified the same way.
+            let offset = index - anchorIndex
+            let slot = ((offset % perBeat) + perBeat) % perBeat
+            if subdivision.silentSlots.contains(slot) { continue }
+            let clickIndex = plan.times.count
+            plan.times.append(time)
+            if slot != 0 {
+                plan.subdivisions.insert(clickIndex)
+            } else if offset % measureStride == 0 {
+                plan.downbeats.insert(clickIndex)
+            }
+        }
+        return plan
     }
 }

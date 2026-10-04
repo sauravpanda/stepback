@@ -438,24 +438,12 @@ private extension ListeningPlayerView {
     /// the click, so drills and step timing keep scoring against real beats.
     @discardableResult
     func installClickTrack() async -> Bool {
-        let beats = clip.beatTimes
-        let perBeat = subdivision.perBeat
-        let clicks = PhraseGrid.subdivide(beatTimes: beats, perBeat: perBeat)
-        let measureStride = max(1, clip.beatsPerMeasure) * perBeat
-        let anchorIndex = BeatGrid.nearestBeatIndex(
-            to: clip.firstDownbeatSeconds ?? 0,
-            in: clicks
-        ) ?? 0
-
-        var downbeats: Set<Int> = []
-        var subdivisions: Set<Int> = []
-        for index in clicks.indices {
-            if perBeat > 1, (index - anchorIndex) % perBeat != 0 {
-                subdivisions.insert(index)
-            } else if (index - anchorIndex) % measureStride == 0 {
-                downbeats.insert(index)
-            }
-        }
+        let plan = PhraseGrid.clickPlan(
+            beatTimes: clip.beatTimes,
+            subdivision: subdivision,
+            anchor: clip.firstDownbeatSeconds,
+            beatsPerMeasure: clip.beatsPerMeasure
+        )
 
         // Captured out of the transform so the previous file can be
         // released only after the player has actually switched off it.
@@ -464,9 +452,9 @@ private extension ListeningPlayerView {
         let ok = await vm.rebuildItem { source in
             let composed = try await MetronomeMixer.composedAsset(
                 source: source,
-                beatTimes: clicks,
-                downbeatIndices: downbeats,
-                subdivisionIndices: subdivisions
+                beatTimes: plan.times,
+                downbeatIndices: plan.downbeats,
+                subdivisionIndices: plan.subdivisions
             )
             installedURL = composed.fileURL
             return composed.asset

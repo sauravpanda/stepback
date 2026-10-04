@@ -114,16 +114,30 @@ struct CountRow: View {
         .animation(.easeOut(duration: 0.06), value: currentSlot)
     }
 
+    /// A swung triple's "a" is a step, so it draws larger than an ordinary
+    /// subdivision; its silent "&" draws smallest, a placeholder for time
+    /// that passes without a step.
     private func size(_ slot: Int) -> CGFloat {
-        slot == 0 ? 9 : 5
+        if slot == 0 { return 9 }
+        if slot == subdivision.stepSlot { return 7 }
+        return subdivision.silentSlots.contains(slot) ? 3 : 5
     }
 
     private func fill(beat: Int, slot: Int) -> Color {
         guard beat == currentBeat, slot == currentSlot else {
             return Theme.Color.surfaceElevated
         }
-        // Beat 1 of the 8 is the landmark, so it lights in the accent.
-        return beat == 1 && slot == 0 ? Theme.Color.accent : Theme.Color.textPrimary
+        // The silent "&" never lights: the step on the number is still
+        // happening, and a flash there would invite stepping on it.
+        if subdivision.silentSlots.contains(slot) {
+            return Theme.Color.surfaceElevated
+        }
+        // Beat 1 of the 8 is the landmark, and the swung "a" is the step
+        // being learned, so both light in the accent.
+        if (beat == 1 && slot == 0) || slot == subdivision.stepSlot {
+            return Theme.Color.accent
+        }
+        return Theme.Color.textPrimary
     }
 }
 
