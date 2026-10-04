@@ -6,11 +6,13 @@ import UIKit
 /// The big count readout. `isRevealed` is what makes Count It Out work —
 /// the drill hides the number and the dancer has to keep the count
 /// internally, so the view still knows the position but refuses to show it.
+///
+/// It only ever shows the beat number. Flashing "e & a" here swapped the
+/// largest thing on screen up to eight times a second at dance tempos —
+/// too fast to read, and it pulled the eye off the beat. The subdivision
+/// lives in the small `CountRow` dots instead.
 struct PhraseCounter: View {
     let position: Int?
-    /// What to say on this slot — the beat number on the beat itself, or
-    /// "e" / "&" / "a" / "trip" / "let" between beats.
-    let spoken: String?
     let phraseLength: Int
     let isRevealed: Bool
     let pulseID: Int
@@ -22,14 +24,6 @@ struct PhraseCounter: View {
     /// shoves the whole screen around several times a second.
     private static let numberHeight: CGFloat = 84
     private static let captionHeight: CGFloat = 16
-
-    /// True on the "e", "&" and "a". Distinguished by colour rather than by
-    /// size — a smaller font would change the line's height and move
-    /// everything below it.
-    private var isOffBeat: Bool {
-        guard let spoken, let position else { return false }
-        return spoken != "\(position)"
-    }
 
     var body: some View {
         VStack(spacing: 2) {
@@ -52,23 +46,16 @@ struct PhraseCounter: View {
     }
 
     private var numberColor: Color {
-        guard isRevealed else { return Theme.Color.textTertiary }
-        return isOffBeat ? Theme.Color.textSecondary : Theme.Color.textPrimary
+        isRevealed ? Theme.Color.textPrimary : Theme.Color.textTertiary
     }
 
     private var display: String {
         guard isRevealed, let position else { return "–" }
-        return spoken ?? "\(position)"
+        return "\(position)"
     }
 
-    /// On a beat the big text *is* the number, so the caption only supplies
-    /// the total. On a subdivision the number has been displaced by "e" or
-    /// "&", so the caption carries it instead — otherwise "e of 8" reads as
-    /// nonsense.
     private var caption: String {
-        guard isRevealed else { return "counting blind" }
-        guard isOffBeat, let position else { return "of \(phraseLength)" }
-        return "\(position) of \(phraseLength)"
+        isRevealed ? "of \(phraseLength)" : "counting blind"
     }
 }
 
@@ -114,16 +101,33 @@ struct CountRow: View {
         .animation(.easeOut(duration: 0.06), value: currentSlot)
     }
 
+    /// A swung triple's "a" is a step, so it draws larger than an ordinary
+    /// subdivision; its silent "&" draws smallest, a placeholder for time
+    /// that passes without a step.
     private func size(_ slot: Int) -> CGFloat {
-        slot == 0 ? 9 : 5
+        if slot == 0 { return 9 }
+        if slot == subdivision.stepSlot { return 7 }
+        return subdivision.silentSlots.contains(slot) ? 3 : 5
     }
 
+    /// The beat's own dot stays lit for the whole beat, so the only thing
+    /// moving fast is a small subdivision dot — at 120 BPM in sixteenths
+    /// the beat dot would otherwise blink off eight times a second.
     private func fill(beat: Int, slot: Int) -> Color {
-        guard beat == currentBeat, slot == currentSlot else {
+        guard beat == currentBeat, slot == 0 || slot == currentSlot else {
             return Theme.Color.surfaceElevated
         }
-        // Beat 1 of the 8 is the landmark, so it lights in the accent.
-        return beat == 1 && slot == 0 ? Theme.Color.accent : Theme.Color.textPrimary
+        // The silent "&" never lights: the step on the number is still
+        // happening, and a flash there would invite stepping on it.
+        if subdivision.silentSlots.contains(slot) {
+            return Theme.Color.surfaceElevated
+        }
+        // Beat 1 of the 8 is the landmark, and the swung "a" is the step
+        // being learned, so both light in the accent.
+        if (beat == 1 && slot == 0) || slot == subdivision.stepSlot {
+            return Theme.Color.accent
+        }
+        return Theme.Color.textPrimary
     }
 }
 
