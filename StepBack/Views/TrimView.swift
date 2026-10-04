@@ -223,8 +223,11 @@ struct TrimView: View {
         }
         .buttonStyle(.plain)
     }
+}
 
-    // MARK: - Transport
+// MARK: - Transport
+
+extension TrimView {
 
     private func togglePlayPause() {
         if isPlaying {
@@ -307,28 +310,27 @@ struct TrimView: View {
     /// offset is known — i.e. the clip was never trimmed, or its trim filename
     /// records its source range. Falls back to the already-trimmed file
     /// (narrow only) for legacy trims or when the original is gone.
-    private func resolveTrimSource() async throws
-        -> (asset: AVURLAsset, offset: Double, isOriginal: Bool) {
+    private func resolveTrimSource() async throws -> TrimSource {
         let parsedStart = clip.trimmedFileName
             .flatMap { TrimStorage.bounds(fromName: $0)?.start }
         let offsetKnown = clip.trimmedFileName == nil || parsedStart != nil
 
         if offsetKnown {
             if let url = clip.originalFileURL {
-                return (AVURLAsset(url: url), parsedStart ?? 0, true)
+                return TrimSource(asset: AVURLAsset(url: url), offset: parsedStart ?? 0, isOriginal: true)
             }
             if let urlAsset = try? await resolvePhotoAsset() {
-                return (urlAsset, parsedStart ?? 0, true)
+                return TrimSource(asset: urlAsset, offset: parsedStart ?? 0, isOriginal: true)
             }
         }
 
         // Fallback: trim the current playable file. Annotations already align
         // with it (offset 0), but we can only narrow.
         if let url = clip.preferredLocalFileURL {
-            return (AVURLAsset(url: url), 0, false)
+            return TrimSource(asset: AVURLAsset(url: url), offset: 0, isOriginal: false)
         }
         if let urlAsset = try? await resolvePhotoAsset() {
-            return (urlAsset, 0, false)
+            return TrimSource(asset: urlAsset, offset: 0, isOriginal: false)
         }
         throw TrimError.exportFailed("Couldn't load the clip to trim.")
     }
@@ -417,6 +419,17 @@ struct TrimView: View {
     }
 }
 
+/// Where `TrimView` trims from, and how the current annotation timeline
+/// maps onto it.
+private struct TrimSource {
+    let asset: AVURLAsset
+    /// Seconds from the annotation timeline to `asset`'s timeline.
+    let offset: Double
+    /// True for the full original (handles can widen); false for the
+    /// already-trimmed fallback (narrow only).
+    let isOriginal: Bool
+}
+
 // MARK: - Range bar
 
 /// Two draggable handles + a playhead. The playhead is read-only here —
@@ -467,8 +480,8 @@ private struct TrimRangeBar: View {
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
-                                let t = timeFor(x: value.location.x, width: width)
-                                trimStart = max(0, min(t, trimEnd - 0.05))
+                                let time = timeFor(x: value.location.x, width: width)
+                                trimStart = max(0, min(time, trimEnd - 0.05))
                                 onSeek(trimStart)
                             }
                     )
@@ -478,8 +491,8 @@ private struct TrimRangeBar: View {
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
-                                let t = timeFor(x: value.location.x, width: width)
-                                trimEnd = min(duration, max(t, trimStart + 0.05))
+                                let time = timeFor(x: value.location.x, width: width)
+                                trimEnd = min(duration, max(time, trimStart + 0.05))
                                 onSeek(trimEnd)
                             }
                     )

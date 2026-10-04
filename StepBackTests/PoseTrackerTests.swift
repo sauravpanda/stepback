@@ -1,5 +1,5 @@
-@testable import StepBack
 import CoreGraphics
+@testable import StepBack
 import Vision
 import XCTest
 
@@ -15,9 +15,9 @@ final class PoseTrackerTests: XCTestCase {
         let names: [VNHumanBodyPoseObservation.JointName] =
             [.nose, .leftShoulder, .rightShoulder, .leftHip, .rightHip,
              .leftWrist, .rightWrist, .leftAnkle]
-        let joints = (0..<count).map { i in
+        let joints = (0..<count).map { index in
             DetectedJoint(
-                name: names[i % names.count],
+                name: names[index % names.count],
                 normalizedPosition: center,
                 confidence: confidence
             )
@@ -96,7 +96,7 @@ final class PoseTrackerTests: XCTestCase {
         let pinnedOne = pose(at: CGPoint(x: 0.82, y: 0.5), count: 3)
         let sel = tracker.select(from: [
             pose(at: CGPoint(x: 0.2, y: 0.5), count: 6),  // prominent, but not pinned
-            pinnedOne,
+            pinnedOne
         ])
         XCTAssertEqual(sel?.pose, pinnedOne)
     }
@@ -192,13 +192,13 @@ final class PoseTrackerTests: XCTestCase {
     // MARK: - Centroid
 
     func testCentroidIsAverageOfJoints() {
-        let p = DetectedPose(joints: [
+        let pose = DetectedPose(joints: [
             DetectedJoint(name: .leftHip, normalizedPosition: CGPoint(x: 0.2, y: 0.4), confidence: 1),
-            DetectedJoint(name: .rightHip, normalizedPosition: CGPoint(x: 0.6, y: 0.8), confidence: 1),
+            DetectedJoint(name: .rightHip, normalizedPosition: CGPoint(x: 0.6, y: 0.8), confidence: 1)
         ])
-        let c = PoseTracker.centroid(p)
-        XCTAssertEqual(c.x, 0.4, accuracy: 1e-9)
-        XCTAssertEqual(c.y, 0.6, accuracy: 1e-9)
+        let centroid = PoseTracker.centroid(pose)
+        XCTAssertEqual(centroid.x, 0.4, accuracy: 1e-9)
+        XCTAssertEqual(centroid.y, 0.6, accuracy: 1e-9)
     }
 
     func testCentroidOfEmptyPoseIsZero() {

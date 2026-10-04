@@ -1,5 +1,5 @@
-@testable import StepBack
 import CoreGraphics
+@testable import StepBack
 import XCTest
 
 final class WeightStackingEvaluatorTests: XCTestCase {
@@ -31,7 +31,7 @@ final class WeightStackingEvaluatorTests: XCTestCase {
     func testVerticalBoneScoresZeroAtForty5Degrees() {
         // dx = dy = 100, angle from vertical = 45°.
         let score = WeightStackingEvaluator.alignmentScore(
-            from: CGPoint(x: 0, y: 0),
+            from: CGPoint.zero,
             to: CGPoint(x: 100, y: 100),
             axis: .vertical
         )
@@ -42,7 +42,7 @@ final class WeightStackingEvaluatorTests: XCTestCase {
         // 30°/60° triangle — well past the 45° threshold (angle from
         // vertical = 60°), so score is clamped to 0.
         let score = WeightStackingEvaluator.alignmentScore(
-            from: CGPoint(x: 0, y: 0),
+            from: CGPoint.zero,
             to: CGPoint(x: 100, y: 57.735),  // tan(30°) = 0.577…
             axis: .vertical
         )
@@ -55,7 +55,7 @@ final class WeightStackingEvaluatorTests: XCTestCase {
         let dx = sin(angle) * 100
         let dy = cos(angle) * 100
         let score = WeightStackingEvaluator.alignmentScore(
-            from: CGPoint(x: 0, y: 0),
+            from: CGPoint.zero,
             to: CGPoint(x: dx, y: dy),
             axis: .vertical
         )
@@ -75,7 +75,7 @@ final class WeightStackingEvaluatorTests: XCTestCase {
 
     func testHorizontalBoneScoresZeroAtForty5Degrees() {
         let score = WeightStackingEvaluator.alignmentScore(
-            from: CGPoint(x: 0, y: 0),
+            from: CGPoint.zero,
             to: CGPoint(x: 100, y: 100),
             axis: .horizontal
         )
@@ -96,7 +96,7 @@ final class WeightStackingEvaluatorTests: XCTestCase {
     func testNeutralBoneAlwaysScoresOne() {
         // Same diagonal that scored 0 for vertical and horizontal.
         let score = WeightStackingEvaluator.alignmentScore(
-            from: CGPoint(x: 0, y: 0),
+            from: CGPoint.zero,
             to: CGPoint(x: 100, y: 100),
             axis: .neutral
         )

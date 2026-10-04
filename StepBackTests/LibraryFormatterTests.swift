@@ -29,25 +29,25 @@ final class LibraryFormatterTests: XCTestCase {
 
     /// Force en_US_POSIX so localised separators (",", " de ", non-breaking
     /// spaces) don't make these assertions environment-dependent.
-    private static func enUSPosix() -> Calendar {
+    private static func enUSPosix() throws -> Calendar {
         var cal = Calendar(identifier: .gregorian)
         cal.locale = Locale(identifier: "en_US_POSIX")
-        cal.timeZone = TimeZone(identifier: "UTC")!
+        cal.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
         return cal
     }
 
-    private func makeDate(year: Int, month: Int, day: Int) -> Date {
+    private func makeDate(year: Int, month: Int, day: Int) throws -> Date {
         var comp = DateComponents()
         comp.year = year
         comp.month = month
         comp.day = day
-        return Self.enUSPosix().date(from: comp)!
+        return try XCTUnwrap(Self.enUSPosix().date(from: comp))
     }
 
-    func testShortDateOmitsYearWhenSameAsNow() {
-        let cal = Self.enUSPosix()
-        let now = makeDate(year: 2026, month: 5, day: 9)
-        let date = makeDate(year: 2026, month: 3, day: 11)
+    func testShortDateOmitsYearWhenSameAsNow() throws {
+        let cal = try Self.enUSPosix()
+        let now = try makeDate(year: 2026, month: 5, day: 9)
+        let date = try makeDate(year: 2026, month: 3, day: 11)
 
         // Always contains the month abbreviation and day; never the year.
         let formatted = LibraryFormatter.shortDate(date, now: now, calendar: cal)
@@ -56,10 +56,10 @@ final class LibraryFormatterTests: XCTestCase {
         XCTAssertFalse(formatted.contains("2026"))
     }
 
-    func testShortDateIncludesYearWhenDifferentFromNow() {
-        let cal = Self.enUSPosix()
-        let now = makeDate(year: 2026, month: 5, day: 9)
-        let date = makeDate(year: 2024, month: 3, day: 11)
+    func testShortDateIncludesYearWhenDifferentFromNow() throws {
+        let cal = try Self.enUSPosix()
+        let now = try makeDate(year: 2026, month: 5, day: 9)
+        let date = try makeDate(year: 2024, month: 3, day: 11)
 
         let formatted = LibraryFormatter.shortDate(date, now: now, calendar: cal)
         XCTAssertTrue(formatted.contains("Mar"))

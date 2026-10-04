@@ -70,7 +70,7 @@ struct PoseTracker {
 
         guard let predicted = predictedCentroid else {
             // No lock yet (auto, first frame): take the most prominent person.
-            return adopt(mostProminent(candidates), isContinuation: false)
+            return mostProminent(candidates).map { adopt($0, isContinuation: false) }
         }
 
         let ranked = candidates
@@ -86,7 +86,7 @@ struct PoseTracker {
             }
             // Auto mode: the tracked person left — re-anchor to the most
             // prominent candidate.
-            return adopt(mostProminent(candidates), isContinuation: false)
+            return mostProminent(candidates).map { adopt($0, isContinuation: false) }
         }
 
         // A rival is almost as close as the best match. When pinned, refuse
@@ -123,25 +123,26 @@ struct PoseTracker {
     /// Commits to `pose`, updating the lock position and the velocity
     /// estimate (the step from the previous lock to this one).
     private mutating func adopt(_ pose: DetectedPose, isContinuation: Bool) -> Selection {
-        let c = Self.centroid(pose)
+        let centroid = Self.centroid(pose)
         if isContinuation, let last = lastCentroid {
-            lastVelocity = CGVector(dx: c.x - last.x, dy: c.y - last.y)
+            lastVelocity = CGVector(dx: centroid.x - last.x, dy: centroid.y - last.y)
         } else {
             lastVelocity = .zero
         }
-        lastCentroid = c
+        lastCentroid = centroid
         return Selection(pose: pose, isContinuation: isContinuation)
     }
 
     /// Most clearly-visible candidate: most joints, ties broken by mean
-    /// confidence. Used for the first lock and for re-anchoring.
-    private func mostProminent(_ candidates: [DetectedPose]) -> DetectedPose {
+    /// confidence. Used for the first lock and for re-anchoring. Nil only
+    /// when `candidates` is empty.
+    private func mostProminent(_ candidates: [DetectedPose]) -> DetectedPose? {
         candidates.max { a, b in
             if a.joints.count != b.joints.count {
                 return a.joints.count < b.joints.count
             }
             return Self.meanConfidence(a) < Self.meanConfidence(b)
-        }!
+        }
     }
 
     /// Average of a pose's joint positions — a cheap, stable centroid.
@@ -153,8 +154,8 @@ struct PoseTracker {
                 y: acc.y + joint.normalizedPosition.y
             )
         }
-        let n = CGFloat(pose.joints.count)
-        return CGPoint(x: sum.x / n, y: sum.y / n)
+        let count = CGFloat(pose.joints.count)
+        return CGPoint(x: sum.x / count, y: sum.y / count)
     }
 
     private static func meanConfidence(_ pose: DetectedPose) -> Float {

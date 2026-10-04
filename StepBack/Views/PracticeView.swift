@@ -16,8 +16,10 @@ struct PracticeView: View {
     /// swiped to: moving on shouldn't also mean pressing play again.
     let autoplay: Bool
 
-    @Environment(\.modelContext) private var modelContext
-    @StateObject private var vm: PracticePlayerViewModel
+    // Internal rather than private: the PracticeView+*.swift extensions
+    // read the model context and the player view model too.
+    @Environment(\.modelContext) var modelContext
+    @StateObject var vm: PracticePlayerViewModel
     @State private var splitSheetPresented = false
     @State private var editingSegment: ClipSegment?
     @State private var trimSheetPresented = false
@@ -197,16 +199,20 @@ struct PracticeView: View {
             }
             .presentationDetents([.medium])
         }
-        .fullScreenCover(isPresented: $trimSheetPresented, onDismiss: {
-            // After a trim the underlying file has changed; rebind the player.
-            // Fall through to the sandboxed original if the user backed out
-            // of the trim sheet without exporting.
-            Task { await vm.reloadAsset(localFileURL: clip.preferredLocalFileURL) }
-        }) {
-            // TrimView loads the original in its own player, so it no longer
-            // shares ours.
-            TrimView(clip: clip)
-        }
+        .fullScreenCover(
+            isPresented: $trimSheetPresented,
+            onDismiss: {
+                // After a trim the underlying file has changed; rebind the player.
+                // Fall through to the sandboxed original if the user backed out
+                // of the trim sheet without exporting.
+                Task { await vm.reloadAsset(localFileURL: clip.preferredLocalFileURL) }
+            },
+            content: {
+                // TrimView loads the original in its own player, so it no longer
+                // shares ours.
+                TrimView(clip: clip)
+            }
+        )
         .sheet(item: $editingSegment) { segment in
             SegmentEditSheet(
                 segment: segment,
@@ -221,7 +227,9 @@ struct PracticeView: View {
             .preferredColorScheme(.dark)
         }
     }
+}
 
+extension PracticeView {
     @ViewBuilder
     private var content: some View {
         if let error = vm.loadError {
@@ -240,35 +248,36 @@ struct PracticeView: View {
                 ZoomablePlayerContainer(
                     onSingleTap: { vm.togglePlayPause() },
                     onLongPressLocated: { fraction in pinDancer(atContainerFraction: fraction) },
-                    onSwipe: openNeighbor
-                ) {
-                    // Rotation: size the surface to axis-swapped bounds for
-                    // 90°/270° so the rotated result aspect-fits the
-                    // container, then spin it into place. The pose overlay
-                    // sits inside the same frame, so the skeleton rotates in
-                    // lockstep with the pixels it annotates.
-                    GeometryReader { geo in
-                        let quarterTurns = vm.rotationQuarterTurns
-                        let swapAxes = quarterTurns % 2 == 1
-                        ZStack {
-                            PlayerSurface(player: vm.player)
-                            if poseCoordinator.isActive {
-                                PoseOverlay(
-                                    pose: poseCoordinator.pose,
-                                    imageSize: poseCoordinator.imageSize,
-                                    poseAge: poseCoordinator.poseAge,
-                                    debugCandidates: poseDebug ? poseCoordinator.candidates : []
-                                )
+                    onSwipe: openNeighbor,
+                    content: {
+                        // Rotation: size the surface to axis-swapped bounds for
+                        // 90°/270° so the rotated result aspect-fits the
+                        // container, then spin it into place. The pose overlay
+                        // sits inside the same frame, so the skeleton rotates in
+                        // lockstep with the pixels it annotates.
+                        GeometryReader { geo in
+                            let quarterTurns = vm.rotationQuarterTurns
+                            let swapAxes = quarterTurns % 2 == 1
+                            ZStack {
+                                PlayerSurface(player: vm.player)
+                                if poseCoordinator.isActive {
+                                    PoseOverlay(
+                                        pose: poseCoordinator.pose,
+                                        imageSize: poseCoordinator.imageSize,
+                                        poseAge: poseCoordinator.poseAge,
+                                        debugCandidates: poseDebug ? poseCoordinator.candidates : []
+                                    )
+                                }
                             }
+                            .frame(
+                                width: swapAxes ? geo.size.height : geo.size.width,
+                                height: swapAxes ? geo.size.width : geo.size.height
+                            )
+                            .rotationEffect(.degrees(Double(quarterTurns) * 90))
+                            .position(x: geo.size.width / 2, y: geo.size.height / 2)
                         }
-                        .frame(
-                            width: swapAxes ? geo.size.height : geo.size.width,
-                            height: swapAxes ? geo.size.width : geo.size.height
-                        )
-                        .rotationEffect(.degrees(Double(quarterTurns) * 90))
-                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
                     }
-                }
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black)
                 .layoutPriority(1)
@@ -513,66 +522,6 @@ struct PracticeView: View {
         .padding(.vertical, 10)
     }
 
-    /// Single-row transport: A/B markers on the left, frame-step + play in
-    /// the middle, speed selector on the right. Replaces the previous
-    /// three rows (loop controls / play / speed pills) — which together
-    /// cost ~150pt of vertical chrome on every clip. The compact A/B
-    /// timestamps drop from the buttons here; the loop region is already
-    /// rendered on the scrubber, and the Trim/Save Pattern action row above
-    /// confirms the action visually when the user does something with A/B.
-    private var transportRow: some View {
-        HStack(spacing: 14) {
-            HStack(spacing: 6) {
-                LoopButton(
-                    label: "A",
-                    filled: vm.loopStart != nil,
-                    caption: nil
-                ) {
-                    vm.markLoopStart()
-                }
-                LoopButton(
-                    label: "B",
-                    filled: vm.loopEnd != nil,
-                    caption: nil
-                ) {
-                    vm.markLoopEnd()
-                }
-                if vm.loopStart != nil || vm.loopEnd != nil {
-                    Button {
-                        vm.clearLoop()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(Theme.Color.textTertiary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Clear loop")
-                }
-            }
-            Spacer(minLength: 8)
-            HStack(spacing: 18) {
-                FrameStepButton(systemName: "backward.frame.fill") {
-                    vm.stepBackward()
-                }
-                Button {
-                    vm.togglePlayPause()
-                } label: {
-                    Image(systemName: vm.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(.black)
-                        .frame(width: 56, height: 56)
-                        .background(Theme.Color.accent, in: Circle())
-                }
-                .buttonStyle(.plain)
-                FrameStepButton(systemName: "forward.frame.fill") {
-                    vm.stepForward()
-                }
-            }
-            Spacer(minLength: 8)
-            SpeedMenuButton(selected: vm.speed, onSelect: vm.setSpeed(_:))
-        }
-    }
-
     /// Discoverable, always-visible row for trim + pattern. The Split button
     /// used to live inside `loopControls` and only appeared when both A and
     /// B were set — fine for users who already knew the workflow, invisible
@@ -613,418 +562,6 @@ struct PracticeView: View {
             }
             .disabled(!vm.hasLoopRegion)
             Spacer()
-        }
-    }
-}
-
-/// Labeled pill button for the practice action row. Two visual variants:
-/// `.accent` (filled accent) for the primary action when ready, `.surface`
-/// for a neutral secondary action, `.surfaceMuted` for a disabled state.
-private struct ActionPill: View {
-    enum Tint { case accent, surface, surfaceMuted }
-
-    let title: String
-    let systemImage: String
-    let tint: Tint
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.system(.footnote, design: .rounded, weight: .semibold))
-                .foregroundStyle(foreground)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(background, in: Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var foreground: Color {
-        switch tint {
-        case .accent: .black
-        case .surface: Theme.Color.textPrimary
-        case .surfaceMuted: Theme.Color.textTertiary
-        }
-    }
-
-    private var background: Color {
-        switch tint {
-        case .accent: Theme.Color.accent
-        case .surface: Theme.Color.surfaceElevated
-        case .surfaceMuted: Theme.Color.surface
-        }
-    }
-}
-
-// MARK: - Persistence + command helpers
-
-extension PracticeView {
-    fileprivate func saveSegment(title: String, preferredSpeed: Double) {
-        guard let start = vm.loopStart, let end = vm.loopEnd, end > start else { return }
-        let nextIndex = (clip.segments.map(\.orderIndex).max() ?? -1) + 1
-        let segment = ClipSegment(
-            title: title,
-            startSeconds: start,
-            endSeconds: end,
-            preferredSpeed: preferredSpeed,
-            orderIndex: nextIndex,
-            clip: clip
-        )
-        modelContext.insert(segment)
-        try? modelContext.save()
-
-        // Render the thumbnail off-actor; persist back when ready.
-        if let asset = vm.player.currentItem?.asset {
-            let segmentID = segment.id
-            let startSeconds = start
-            Task {
-                let data = await SegmentThumbnailGenerator.generate(
-                    from: asset,
-                    atSeconds: startSeconds
-                )
-                await MainActor.run {
-                    if let stored = clip.segments.first(where: { $0.id == segmentID }) {
-                        stored.thumbnailData = data
-                        try? modelContext.save()
-                    }
-                }
-            }
-        }
-    }
-
-    fileprivate func deleteSegment(_ segment: ClipSegment) {
-        modelContext.delete(segment)
-        try? modelContext.save()
-    }
-
-    /// A swipe on the video: move to the neighbour in that direction, if
-    /// there is one. At either end of the list the swipe does nothing, and
-    /// the absence of the usual tick says why.
-    fileprivate func openNeighbor(_ direction: PlayerSwipe.Direction) {
-        let target = direction == .toNext ? neighbors.next : neighbors.previous
-        guard let target, let onOpenNeighbor else { return }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        onOpenNeighbor(target, direction)
-    }
-
-    fileprivate func detectBeats() async {
-        await vm.detectBeats(for: clip) {
-            try? modelContext.save()
-        }
-        configureBeatPulse()
-    }
-
-    fileprivate func configureBeatPulse() {
-        let downbeats = BeatGrid.downbeatIndices(
-            beatTimes: clip.beatTimes,
-            anchor: clip.firstDownbeatSeconds,
-            beatsPerMeasure: clip.beatsPerMeasure
-        )
-        vm.configureBeatPulse(
-            beatTimes: clip.beatTimes,
-            downbeatIndices: downbeats
-        )
-    }
-
-    fileprivate func tapOnBeatOne() {
-        vm.tapOnBeatOne(for: clip) {
-            try? modelContext.save()
-        }
-    }
-
-    fileprivate func clearDownbeat() {
-        vm.clearDownbeatAnchor(for: clip) {
-            try? modelContext.save()
-        }
-    }
-
-    fileprivate func rescaleBeats(by factor: Double) {
-        vm.rescaleBeats(for: clip, factor: factor) {
-            try? modelContext.save()
-        }
-    }
-}
-
-// MARK: - Scrubber
-
-// MARK: - Frame step
-
-private struct FrameStepButton: View {
-    let systemName: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(Theme.Color.textPrimary)
-                .frame(width: 44, height: 44)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Loop controls
-
-private struct LoopButton: View {
-    let label: String
-    let filled: Bool
-    let caption: String?
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Text(label)
-                    .font(.system(.body, design: .rounded, weight: .bold))
-                    .foregroundStyle(filled ? .black : Theme.Color.textPrimary)
-                    .frame(width: 28, height: 28)
-                    .background(
-                        Circle().fill(filled ? Theme.Color.accent : Theme.Color.surfaceElevated)
-                    )
-                if let caption {
-                    Text(caption)
-                        .font(Theme.Font.timestamp)
-                        .foregroundStyle(Theme.Color.textSecondary)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Segments
-
-private struct SegmentList: View {
-    let segments: [ClipSegment]
-    let activeID: UUID?
-    let onPlay: (ClipSegment) -> Void
-    let onEdit: (ClipSegment) -> Void
-
-    var body: some View {
-        if segments.isEmpty {
-            EmptyView()
-        } else {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Patterns")
-                    .font(.system(.footnote, design: .rounded, weight: .semibold))
-                    .foregroundStyle(Theme.Color.textSecondary)
-                    .padding(.horizontal, 4)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(segments) { segment in
-                            SegmentCard(
-                                segment: segment,
-                                isActive: segment.id == activeID,
-                                onPlay: { onPlay(segment) },
-                                onEdit: { onEdit(segment) }
-                            )
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-            }
-        }
-    }
-}
-
-private struct SegmentCard: View {
-    let segment: ClipSegment
-    let isActive: Bool
-    let onPlay: () -> Void
-    let onEdit: () -> Void
-
-    var body: some View {
-        Button(action: onPlay) {
-            HStack(spacing: 10) {
-                segmentGlyph
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(segment.title)
-                        .font(.system(.footnote, design: .rounded, weight: .semibold))
-                        .foregroundStyle(Theme.Color.textPrimary)
-                        .lineLimit(1)
-                    HStack(spacing: 4) {
-                        Text(SpeedFormatter.timestamp(segment.startSeconds))
-                        Text("–")
-                        Text(SpeedFormatter.timestamp(segment.endSeconds))
-                        if segment.preferredSpeed != 1.0 {
-                            Text("·")
-                            Text(SpeedFormatter.pill(segment.preferredSpeed))
-                        }
-                    }
-                    .font(Theme.Font.timestamp)
-                    .foregroundStyle(Theme.Color.textTertiary)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Theme.Color.surfaceElevated)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(isActive ? Theme.Color.accent : Color.clear, lineWidth: 1.5)
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
-            Button {
-                onEdit()
-            } label: {
-                Label("Rename", systemImage: "pencil")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var segmentGlyph: some View {
-        if let data = segment.thumbnailData, let uiImage = UIImage(data: data) {
-            ZStack {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 36, height: 36)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                if isActive {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Theme.Color.accent.opacity(0.4))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "waveform")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.black)
-                }
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isActive ? Theme.Color.accent : Color.clear, lineWidth: 1.5)
-            )
-        } else {
-            Image(systemName: isActive ? "waveform" : "play.fill")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(isActive ? .black : Theme.Color.accent)
-                .frame(width: 36, height: 36)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(isActive ? Theme.Color.accent : Theme.Color.accentSoft)
-                )
-        }
-    }
-}
-
-private struct SegmentSaveSheet: View {
-    let defaultSpeed: Double
-    let defaultRegion: (start: Double, end: Double)
-    let onSave: (String, Double) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var title: String = ""
-    @State private var speed: Double
-
-    init(
-        defaultSpeed: Double,
-        defaultRegion: (start: Double, end: Double),
-        onSave: @escaping (String, Double) -> Void
-    ) {
-        self.defaultSpeed = defaultSpeed
-        self.defaultRegion = defaultRegion
-        self.onSave = onSave
-        _speed = State(initialValue: defaultSpeed)
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Pattern name") {
-                    TextField("Basic step", text: $title)
-                }
-                Section("Range") {
-                    LabeledContent("Start", value: SpeedFormatter.timestamp(defaultRegion.start))
-                        .foregroundStyle(Theme.Color.textSecondary)
-                    LabeledContent("End", value: SpeedFormatter.timestamp(defaultRegion.end))
-                        .foregroundStyle(Theme.Color.textSecondary)
-                    LabeledContent("Length", value: SpeedFormatter.timestamp(max(0, defaultRegion.end - defaultRegion.start)))
-                        .foregroundStyle(Theme.Color.textSecondary)
-                }
-                Section("Practice speed") {
-                    SpeedPills(selected: speed, onSelect: { speed = $0 })
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .listRowBackground(Color.clear)
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(Theme.Color.background)
-            .navigationTitle("New pattern")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-                        onSave(trimmed.isEmpty ? "Pattern" : trimmed, speed)
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .preferredColorScheme(.dark)
-    }
-}
-
-private struct SegmentEditSheet: View {
-    @Bindable var segment: ClipSegment
-    let onDelete: () -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Name") {
-                    TextField("Pattern name", text: $segment.title)
-                }
-                Section("Range") {
-                    LabeledContent("Start", value: SpeedFormatter.timestamp(segment.startSeconds))
-                        .foregroundStyle(Theme.Color.textSecondary)
-                    LabeledContent("End", value: SpeedFormatter.timestamp(segment.endSeconds))
-                        .foregroundStyle(Theme.Color.textSecondary)
-                    LabeledContent("Length", value: SpeedFormatter.timestamp(segment.durationSeconds))
-                        .foregroundStyle(Theme.Color.textSecondary)
-                }
-                Section("Practice speed") {
-                    SpeedPills(selected: segment.preferredSpeed, onSelect: { segment.preferredSpeed = $0 })
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .listRowBackground(Color.clear)
-                }
-                Section("Notes") {
-                    TextField("Notes", text: $segment.notes, axis: .vertical)
-                        .lineLimit(3...)
-                }
-                Section {
-                    Button(role: .destructive) {
-                        onDelete()
-                        dismiss()
-                    } label: {
-                        Label("Delete pattern", systemImage: "trash")
-                    }
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(Theme.Color.background)
-            .navigationTitle("Edit pattern")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        try? modelContext.save()
-                        dismiss()
-                    }
-                }
-            }
         }
     }
 }

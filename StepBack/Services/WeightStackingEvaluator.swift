@@ -81,10 +81,10 @@ enum WeightStackingEvaluator {
 
         switch (hipMid, shoulderMid) {
         case let (hip?, shoulder?):
-            let w = max(0, min(1, hipWeight))
+            let weight = max(0, min(1, hipWeight))
             return CGPoint(
-                x: hip.x * w + shoulder.x * (1 - w),
-                y: hip.y * w + shoulder.y * (1 - w)
+                x: hip.x * weight + shoulder.x * (1 - weight),
+                y: hip.y * weight + shoulder.y * (1 - weight)
             )
         case let (hip?, nil):
             return hip

@@ -101,3 +101,91 @@ enum SpeedFormatter {
         abs(a - b) < 0.001
     }
 }
+
+// MARK: - Action pill
+
+/// Labeled pill button for the practice action row. Two visual variants:
+/// `.accent` (filled accent) for the primary action when ready, `.surface`
+/// for a neutral secondary action, `.surfaceMuted` for a disabled state.
+struct ActionPill: View {
+    enum Tint { case accent, surface, surfaceMuted }
+
+    let title: String
+    let systemImage: String
+    let tint: Tint
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.system(.footnote, design: .rounded, weight: .semibold))
+                .foregroundStyle(foreground)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(background, in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var foreground: Color {
+        switch tint {
+        case .accent: .black
+        case .surface: Theme.Color.textPrimary
+        case .surfaceMuted: Theme.Color.textTertiary
+        }
+    }
+
+    private var background: Color {
+        switch tint {
+        case .accent: Theme.Color.accent
+        case .surface: Theme.Color.surfaceElevated
+        case .surfaceMuted: Theme.Color.surface
+        }
+    }
+}
+
+// MARK: - Frame step
+
+struct FrameStepButton: View {
+    let systemName: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(Theme.Color.textPrimary)
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Loop controls
+
+struct LoopButton: View {
+    let label: String
+    let filled: Bool
+    let caption: String?
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(label)
+                    .font(.system(.body, design: .rounded, weight: .bold))
+                    .foregroundStyle(filled ? .black : Theme.Color.textPrimary)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        Circle().fill(filled ? Theme.Color.accent : Theme.Color.surfaceElevated)
+                    )
+                if let caption {
+                    Text(caption)
+                        .font(Theme.Font.timestamp)
+                        .foregroundStyle(Theme.Color.textSecondary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
