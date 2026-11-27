@@ -11,6 +11,8 @@ enum SettingsKeys {
     static let beatOverlay = "beatOverlayOnVideo"
     /// Whether the Practice player shows the Trim and Save-pattern row.
     static let showTrimTools = "showTrimTools"
+    /// How the Library's Recently Watched row is ordered.
+    static let recentsOrder = "recentsOrder"
 }
 
 /// App settings: whether imports copy video bytes into the sandbox, plus a

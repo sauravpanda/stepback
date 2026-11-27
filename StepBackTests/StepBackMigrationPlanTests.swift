@@ -11,20 +11,21 @@ final class StepBackMigrationPlanTests: XCTestCase {
         XCTAssertEqual(SchemaV1.versionIdentifier, Schema.Version(1, 0, 0))
         XCTAssertEqual(SchemaV2.versionIdentifier, Schema.Version(2, 0, 0))
         XCTAssertEqual(SchemaV3.versionIdentifier, Schema.Version(3, 0, 0))
+        XCTAssertEqual(SchemaV4.versionIdentifier, Schema.Version(4, 0, 0))
     }
 
-    func testSchemaV3ContainsExactlyTheCurrentLiveModels() {
+    func testSchemaV4ContainsExactlyTheCurrentLiveModels() {
         // The point of this test is to fail loudly when someone adds a new
         // @Model type without versioning it. New models should land as part
-        // of a SchemaV4 + migration stage, not by quietly extending V3.
-        let names = Set(SchemaV3.models.map { String(describing: $0) })
+        // of a SchemaV5 + migration stage, not by quietly extending V4.
+        let names = Set(SchemaV4.models.map { String(describing: $0) })
         XCTAssertEqual(names, ["DanceClip", "Tag", "ClipSegment"])
     }
 
     func testFrozenSchemasKeepTheirEntityNames() {
         // The frozen copies are nested types, but their entity names must
         // still match the live classes or migration can't line them up.
-        for schema in [SchemaV1.self, SchemaV2.self] as [any VersionedSchema.Type] {
+        for schema in [SchemaV1.self, SchemaV2.self, SchemaV3.self] as [any VersionedSchema.Type] {
             let names = Set(schema.models.map { String(describing: $0) })
             XCTAssertEqual(names, ["DanceClip", "Tag", "ClipSegment"], "\(schema)")
         }
@@ -34,20 +35,20 @@ final class StepBackMigrationPlanTests: XCTestCase {
 
     func testMigrationPlanRegistersEverySchemaInOrder() {
         let names = StepBackMigrationPlan.schemas.map { String(describing: $0) }
-        XCTAssertEqual(names, ["SchemaV1", "SchemaV2", "SchemaV3"])
+        XCTAssertEqual(names, ["SchemaV1", "SchemaV2", "SchemaV3", "SchemaV4"])
     }
 
     func testMigrationPlanHasOneStagePerStep() {
-        XCTAssertEqual(StepBackMigrationPlan.stages.count, 2)
+        XCTAssertEqual(StepBackMigrationPlan.stages.count, 3)
     }
 
     // MARK: - End-to-end container construction
 
     func testContainerOpensWithMigrationPlan() throws {
         // Smoke test: a fresh in-memory container should construct cleanly
-        // when we route through SchemaV3 + StepBackMigrationPlan, and should
+        // when we route through SchemaV4 + StepBackMigrationPlan, and should
         // accept inserts of every live model type.
-        let schema = Schema(versionedSchema: SchemaV3.self)
+        let schema = Schema(versionedSchema: SchemaV4.self)
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(
             for: schema,
@@ -68,6 +69,7 @@ final class StepBackMigrationPlanTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<Tag>()), 1)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<ClipSegment>()), 1)
         XCTAssertFalse(clip.isFavorite, "a new clip is not a favourite until the user says so")
+        XCTAssertFalse(clip.watchStats.hasBeenWatched, "a new clip has no watch history")
     }
 
     // MARK: - Stored migrations
@@ -80,7 +82,7 @@ final class StepBackMigrationPlanTests: XCTestCase {
     /// Reopens `storeURL` at the current schema through the migration plan
     /// and returns the one clip it should contain.
     private func migratedClip(at storeURL: URL) throws -> DanceClip {
-        let schema = Schema(versionedSchema: SchemaV3.self)
+        let schema = Schema(versionedSchema: SchemaV4.self)
         let container = try ModelContainer(
             for: schema,
             migrationPlan: StepBackMigrationPlan.self,
@@ -158,7 +160,43 @@ final class StepBackMigrationPlanTests: XCTestCase {
         XCTAssertEqual(clip.cloudAssetIdentifier, "CLOUD-V2")
         XCTAssertEqual(clip.bpm, 118)
         XCTAssertFalse(clip.isFavorite, "New V3 column starts false")
+        XCTAssertEqual(clip.watchCount, 0, "New V4 column starts at zero")
         XCTAssertEqual(clip.segments.first?.title, "Whip")
         XCTAssertEqual(clip.tags.first?.name, "Blues")
+    }
+
+    func testV3StoreMigratesToCurrentAsUnwatched() throws {
+        // Every phone that ran the app with Favorites has one of these.
+        let storeURL = temporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: storeURL) }
+
+        try autoreleasepool {
+            let schemaV3 = Schema(versionedSchema: SchemaV3.self)
+            let container = try ModelContainer(
+                for: schemaV3,
+                configurations: ModelConfiguration(schema: schemaV3, url: storeURL)
+            )
+            let context = ModelContext(container)
+            let clip = SchemaV3.DanceClip(title: "Starred", assetIdentifier: "ASSET-V3")
+            clip.isFavorite = true
+            let segment = SchemaV3.ClipSegment(title: "Swingout", startSeconds: 2, endSeconds: 4, clip: clip)
+            let tag = SchemaV3.Tag(name: "Privates", colorHex: "#FF3B7F")
+            clip.tagsStorage = [tag]
+            context.insert(clip)
+            context.insert(segment)
+            context.insert(tag)
+            try context.save()
+        }
+
+        let clip = try migratedClip(at: storeURL)
+        XCTAssertEqual(clip.title, "Starred")
+        XCTAssertTrue(clip.isFavorite)
+        XCTAssertEqual(clip.watchCount, 0)
+        XCTAssertNil(clip.lastWatchedAt)
+        XCTAssertEqual(clip.watchHeat, 0)
+        XCTAssertNil(clip.hiddenFromRecentsAt)
+        XCTAssertFalse(clip.watchStats.isListed)
+        XCTAssertEqual(clip.segments.first?.title, "Swingout")
+        XCTAssertEqual(clip.tags.first?.name, "Privates")
     }
 }

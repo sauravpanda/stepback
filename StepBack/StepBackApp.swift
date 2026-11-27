@@ -19,7 +19,7 @@ struct StepBackApp: App {
 
         Self.ensureStoreDirectoryExists()
 
-        let schema = Schema(versionedSchema: SchemaV3.self)
+        let schema = Schema(versionedSchema: SchemaV4.self)
         do {
             // `cloudKitDatabase: .automatic` — syncs through the app's iCloud
             // container when the entitlement is present (paid developer
