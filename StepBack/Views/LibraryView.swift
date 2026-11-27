@@ -34,6 +34,8 @@ struct LibraryView: View {
     /// default: clips reference the Photos asset and take no extra storage,
     /// at the cost of dying with the Photos original. See `SettingsView`.
     @AppStorage(SettingsKeys.keepLocalCopies) private var keepLocalCopies = false
+    /// How the Recently Watched row is ordered. A habit, so it's remembered.
+    @AppStorage(SettingsKeys.recentsOrder) private var recentsOrder: WatchOrder = .smart
 
     private let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
     private let photosService: PhotosServicing = PhotosService()
@@ -129,6 +131,12 @@ struct LibraryView: View {
         clips.filter(collection.contains)
     }
 
+    /// The Recently Watched row for the collection on show, so an album's
+    /// row only ever shows that album's clips.
+    private var recentClips: [DanceClip] {
+        WatchRanking.rank(filteredClips, by: recentsOrder, stats: \.watchStats)
+    }
+
     @ViewBuilder
     private var content: some View {
         if clips.isEmpty {
@@ -142,6 +150,16 @@ struct LibraryView: View {
                     Spacer()
                 } else {
                     ScrollView {
+                        let recents = recentClips
+                        if !recents.isEmpty, !isSelecting {
+                            LibraryRecentsRow(
+                                clips: recents,
+                                order: $recentsOrder,
+                                onOpen: open,
+                                onRemove: { hideFromRecents([$0]) },
+                                onClear: { hideFromRecents(recents) }
+                            )
+                        }
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(filteredClips) { clip in
                                 clipCell(for: clip)
@@ -149,6 +167,13 @@ struct LibraryView: View {
                         }
                         .padding(12)
                     }
+                    // One scroll identity per collection. Sharing a single
+                    // ScrollView carried the offset across: scrolled deep
+                    // into All, a smaller album opened past its own end and
+                    // showed nothing. A fresh identity starts each
+                    // collection at its top; returning from Practice keeps
+                    // the collection, so it keeps its place too.
+                    .id(collection)
                 }
                 if isSelecting {
                     bulkActionBar
@@ -174,8 +199,7 @@ struct LibraryView: View {
             .buttonStyle(.plain)
         } else {
             Button {
-                autoplayOpened = false
-                openedClip = clip
+                open(clip)
             } label: {
                 LibraryCell(
                     clip: clip,
@@ -187,6 +211,11 @@ struct LibraryView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    private func open(_ clip: DanceClip) {
+        autoplayOpened = false
+        openedClip = clip
     }
 
     private func openNeighbor(_ clip: DanceClip, _ direction: PlayerSwipe.Direction) {
@@ -286,6 +315,15 @@ extension LibraryView {
                 }
             }
         }
+    }
+
+    /// Takes clips out of Recently Watched; their history stays.
+    private func hideFromRecents(_ shown: [DanceClip]) {
+        let now = Date()
+        withAnimation {
+            shown.forEach { $0.watchStats.hide(at: now) }
+        }
+        try? modelContext.save()
     }
 
     private func toggleFavorite(_ clip: DanceClip) {

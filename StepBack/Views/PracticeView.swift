@@ -162,6 +162,15 @@ struct PracticeView: View {
                 vm.play()
             }
         }
+        .task(id: clip.id) {
+            // A visit counts towards Recently Watched once Practice has
+            // stayed open a few seconds, so a mis-tap or swiping straight
+            // past doesn't. Leaving earlier cancels the sleep.
+            try? await Task.sleep(for: .seconds(WatchStats.minimumViewSeconds))
+            guard !Task.isCancelled else { return }
+            clip.watchStats.recordView(at: Date())
+            try? modelContext.save()
+        }
         .onChange(of: clip.beatTimesData) { _, _ in
             // Re-arm the boundary observer when beats are (re-)detected so
             // the pulse comes online without requiring a view re-entry.

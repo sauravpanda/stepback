@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-// These live models are the V3 schema shape (see Schema.swift). CloudKit
+// These live models are the V4 schema shape (see Schema.swift). CloudKit
 // sync imposes three rules on every model here: no unique constraints,
 // every attribute optional or defaulted, every relationship optional.
 // The optional relationship arrays sit behind non-optional computed
@@ -22,6 +22,14 @@ final class DanceClip: Equatable, Hashable {
     /// defaulted `Bool` rather than an optional so CloudKit accepts it and
     /// every row that predates it simply reads as "not yet".
     var isFavorite: Bool = false
+
+    // Watch history behind the Library's Recently Watched row; see
+    // `WatchStats`. Defaulted or optional for CloudKit, so every row that
+    // predates them reads as "never watched".
+    var watchCount: Int = 0
+    var lastWatchedAt: Date?
+    var watchHeat: Double = 0
+    var hiddenFromRecentsAt: Date?
 
     // Beat analysis, populated once by BeatDetector and cached in the store.
     var bpm: Double?
@@ -88,6 +96,25 @@ final class DanceClip: Equatable, Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+
+    // MARK: - Watch history
+
+    var watchStats: WatchStats {
+        get {
+            WatchStats(
+                count: watchCount,
+                lastWatchedAt: lastWatchedAt,
+                heat: watchHeat,
+                hiddenAt: hiddenFromRecentsAt
+            )
+        }
+        set {
+            watchCount = newValue.count
+            lastWatchedAt = newValue.lastWatchedAt
+            watchHeat = newValue.heat
+            hiddenFromRecentsAt = newValue.hiddenAt
+        }
     }
 
     // MARK: - Beat helpers
